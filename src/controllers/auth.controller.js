@@ -73,7 +73,7 @@ const login = async (req, res) => {
     if (!user)
       return res.status(401).json({ message: "Sai thông tin đăng nhập" });
 
-    // So khớp mật khẩu 
+    // So khớp mật khẩu
     const ok = await bcrypt.compare(password, user.password_hash);
     if (!ok)
       return res.status(401).json({ message: "Sai thông tin đăng nhập" });
@@ -86,7 +86,14 @@ const login = async (req, res) => {
       return res.status(403).json({ message: "Tài khoản đã bị khóa" });
     }
 
-    const payload = { id: user.id, role: user.role, status: user.status };
+    const payload = {
+      id: user.id,
+      full_name: user.full_name,
+      phone: user?.phone || "Chua co sdt",
+      email: user?.email || "Chua co email",
+      role: user.role,
+      status: user.status,
+    };
     const access_token = signAccessToken(payload);
     const refresh_token =
       typeof signRefreshToken === "function"
@@ -111,6 +118,35 @@ const login = async (req, res) => {
   }
 };
 
+const changePassword = async (req, res) => {
+  try {
+
+    const { oldPass, newPass } = req.body;
+    if (!oldPass || !newPass)
+      return res.status(404).json({
+        message: "Missing credentials",
+      });
+    const pickUser = User.findOne({
+      where: {
+        email: user.email,
+      },
+    });
+    const isCorrectPassword = await compare(oldPass, pickUser.password_hash);
+
+    if (isCorrectPassword) {
+      const newHashPassword = await hash(newPass);
+      User.update(
+        { password_hash: newHashPassword },
+        { where: { id: user.id } }
+      );
+    }
+  } catch (error) {
+    res.status(500).json({
+      message: "Internal error " + error.message,
+      sqlMessage: error.sql,
+    });
+  }
+};
 const logout = async (req, res) => {
   res.status(200).json({ message: "Logout successful" });
 };
