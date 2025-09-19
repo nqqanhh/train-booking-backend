@@ -1,0 +1,152 @@
+import { where } from "sequelize";
+import { db } from "../../models/index.js";
+const { Routes } = db;
+
+const user = req.user;
+
+const isAuthorized = () => {
+  if (!user) {
+    return false;
+  }
+  return true;
+};
+
+//===client===
+const getRoutes = async (req, res) => {
+  try {
+    if (!isAuthorized) {
+      return res.status(401).json({
+        message: "Unauthorized",
+      });
+    }
+    const routeList = await Routes.find();
+    res.status(200).json({
+      message: "Get routes successfully",
+      routes: routeList,
+    });
+  } catch (error) {
+    res.status(500).json({
+      message: "Internal error: " + error.message,
+      sqlMessage: error.sql,
+    });
+  }
+};
+
+//===admin===
+
+//create
+const createRoute = async (req, res) => {
+  try {
+    if (!isAuthorized) {
+      return res.status(401).json({
+        message: "Unauthorized",
+      });
+    }
+
+    const { origin, destination, eta_minutes, distance_km } = req.body;
+    if (!origin || !destination || !eta_minutes || !distance_km) {
+      return res.status(404).json({
+        message: "Missing credentials",
+      });
+    }
+    const newRoute = {
+      origin: origin,
+      destination: destination,
+      eta_minutes: eta_minutes,
+      distance_km: distance_km,
+      active: true,
+    };
+    await Routes.create(newRoute);
+    res.status(200).json({
+      message: "Create new route successfully",
+      newRoute: newRoute,
+    });
+  } catch (error) {
+    res.status(500).json({
+      message: "Internal error: " + error.message,
+      sqlMessage: error.sql,
+    });
+  }
+};
+
+//update
+const updateRoute = async (req, res) => {
+  try {
+    if (!isAuthorized) {
+      return res.status(401).json({
+        message: "Unauthorized",
+      });
+    }
+    const { routeId } = req.params;
+    const { origin, destination, distance_km, eta_minutes, isActive } =
+      req.body;
+    const pickedRoute = Routes.findOne({ where: { id: routeId } });
+    if (!pickedRoute) {
+      return res.status(404).json({
+        message: "Counldn't find this route",
+      });
+    }
+    // Update route fields
+    if (origin) pickedRoute.origin = origin;
+    if (destination) pickedRoute.destination = destination;
+    if (distance_km) pickedRoute.distance_km = distance_km;
+    if (eta_minutes) pickedRoute.eta_minutes = eta_minutes;
+    if (isActive) pickedRoute.active = isActive;
+
+    await Routes.update(
+      {
+        origin: pickedRoute.origin,
+        destination: pickedRoute.destination,
+        distance_km: pickedRoute.distance_km,
+        eta_minutes: pickedRoute.eta_minutes,
+        active: pickedRoute.active,
+      },
+      {
+        where: {
+          id: pickedRoute.id,
+        },
+      }
+    );
+    res.status(200).json({
+      message: `Update route ${pickedRoute.origin} - ${pickedRoute.destination} successfully`,
+    });
+  } catch (error) {
+    res.status(500).json({
+      message: "Internal error: " + error.message,
+      sqlMessage: error.sql,
+    });
+  }
+};
+
+//delete route
+const deleteRoute = async (req, res) => {
+  try {
+    if (!isAuthorized) {
+      return res.status(401).json({
+        message: "Unauthorized",
+      });
+    }
+    const { routeId } = req.params;
+    const pickedRoute = Routes.findOne({ where: { id: routeId } });
+    if (!pickedRoute) {
+      return res.status(404).json({
+        message: `This route doesn't exist`,
+      });
+    }
+    await Routes.delete({
+      where: {
+        id: pickedRoute.id,
+      },
+    });
+    res.status(200).json({
+      message: `deleted route ${pickedRoute.origin} - ${pickedRoute.destination} successfully`,
+    });
+  } catch (error) {
+    res.status(500).json({
+      message: "Internal error: " + error.message,
+      sqlMessage: error.sql,
+    });
+  }
+};
+const routesController = { getRoutes, createRoute, updateRoute, deleteRoute };
+export default routesController;

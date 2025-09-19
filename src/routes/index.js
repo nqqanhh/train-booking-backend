@@ -21,16 +21,16 @@ router.get("/", (req, res) => {
 //
 router.use("/auth", authRouter);
 router.use("/coupons", couponsRouter);
-router.use("/support-requests", supportRequestRouter);
+router.use("/support-requests", authorizationToken, supportRequestRouter);
 router.use("/profile", authorizationToken, usersRouter);
-router.use("/trips", tripsRouter);
-router.use("/tripseats", tripSeatsRouter);
-router.use("/tickets", ticketsRouter);
-router.use("/payments", paymentsRouter);
-router.use("/orders", ordersRouter);
-router.use("/notifications", notificationsRouter);
-router.use("/routes", routesRouter);
-router.use("passenger-profile", passengerProfileRouter);
+router.use("/trips", authorizationToken, tripsRouter);
+router.use("/tripseats", authorizationToken, tripSeatsRouter);
+router.use("/tickets",authorizationToken, ticketsRouter);
+router.use("/payments", authorizationToken, paymentsRouter);
+router.use("/orders", authorizationToken, ordersRouter);
+router.use("/notifications", authorizationToken, notificationsRouter);
+router.use("/routes", authorizationToken, routesRouter);
+router.use("passenger-profile", authorizationToken, passengerProfileRouter);
 //
 
 export default router;
