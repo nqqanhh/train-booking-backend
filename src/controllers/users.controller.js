@@ -1,5 +1,5 @@
 import { compare, hash } from "bcrypt";
-import db from "../../models/index.js";
+import db from "../models/index.js";
 const { User } = db;
 const getMyProfile = async (req, res) => {
   // Assuming req.user is populated by authentication middleware

@@ -1,6 +1,6 @@
 import { hash, comparePassword } from "../utils/password.js";
 // import user from "../models/user.js";
-import db from "../../models/index.js";
+import db from "../models/index.js";
 import { signAccessToken, signRefreshToken } from "../utils/jwt.js";
 import bcrypt from "bcrypt";
 

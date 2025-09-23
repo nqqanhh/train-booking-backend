@@ -1,5 +1,14 @@
-import db from "../../models/index.js";
-const { sequelize, Trip, SeatTemplateSeat, TripSeat, Order, OrderItem } = db;
+import db from "../models/index.js";
+const {
+  sequelize,
+  Trip,
+  SeatTemplateSeat,
+  TripSeat,
+  Order,
+  OrderItem,
+  User,
+  Payment,
+} = db;
 
 const buildPriceMaps = async (trip_id) => {
   const trip = await Trip.findByPk(trip_id);
@@ -102,6 +111,74 @@ const createOrder = async (req, res) => {
   }
 };
 
-const orderController = { previewOrder, createOrder };
+const getOrderDetail = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const order = await Order.findOne({
+      where: { id },
+      include: [
+        {
+          model: User,
+          as: "user",
+          attributes: ["id", "full_name", "email", "phone"],
+        },
+        {
+          model: OrderItem,
+          as: "items",
+          attributes: [
+            {
+              model: db.PassengerProfile,
+              as: "passenger",
+              attributes: ["id", "full_name", "id_no", "dob", "phone"],
+            },
+            {
+              model: db.TripSeat,
+              as: "trip_seat",
+              attributes: ["id", "trip_id", "seat_code", "sold_at"],
+            },
+            {
+              model: db.Ticket,
+              as: "ticket",
+              attributes: [
+                "id",
+                "qr_payload",
+                "status",
+                "issued_at",
+                "used_at",
+              ],
+            },
+          ],
+        },
+        {
+          model: Payment,
+          as: "payments",
+          attributes: [
+            "id",
+            "provider",
+            "provider_txn_id",
+            "amount",
+            "status",
+            "created_at",
+          ],
+        },
+      ],
+    });
+    if (!order)
+      return res.status(404).json({
+        message: "Order not found",
+      });
+    res.status(200).json({
+      message: "OK",
+      order,
+    });
+  } catch (error) {
+    res.status(500).json({
+      message: "get order detail failed",
+      detail: error.message,
+    });
+  }
+};
+const orderController = { previewOrder, createOrder, getOrderDetail };
 
 export default orderController;

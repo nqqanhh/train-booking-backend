@@ -1,4 +1,4 @@
-import db from "../../models/index.js";
+import db from "../models/index.js";
 const { Trip, Route, SeatTemplate, TripSeat, TripSeatPricing } = db;
 import { parseTod, parseYMD, yyyymmdd } from "../utils/format-date-time.js";
 //===user===

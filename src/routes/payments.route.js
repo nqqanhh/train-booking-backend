@@ -7,6 +7,6 @@ import {
 const paymentsRouter = Router();
 
 paymentsRouter.post("/paypal/create-order", paypalCreateOrder);
-paymentsRouter.get("/capture", paypalCapture);
+paymentsRouter.get("/paypal/capture", paypalCapture);
 paymentsRouter.post("/paypal/capture", paypalCapture);
 export default paymentsRouter;

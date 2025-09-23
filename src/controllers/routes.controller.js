@@ -1,5 +1,5 @@
 import { where } from "sequelize";
-import db from "../../models/index.js";
+import db from "../models/index.js";
 const { Route } = db;
 
 const isAuthorized = (req) => {
