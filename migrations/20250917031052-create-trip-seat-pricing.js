@@ -16,6 +16,18 @@ module.exports = {
       trip_id: { type: S.BIGINT, allowNull: false }, // KHỚP Trips.id (bigint signed)
       seat_code: { type: S.STRING(32), allowNull: false },
       price: { type: S.DECIMAL(12, 2), allowNull: false },
+      createdAt: {
+        allowNull: false,
+        type: S.DATE,
+        defaultValue: S.literal("CURRENT_TIMESTAMP"),
+      },
+      updatedAt: {
+        allowNull: false,
+        type: S.DATE,
+        defaultValue: S.literal(
+          "CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP"
+        ),
+      },
     });
 
     // FK → Trips(id)

@@ -1,6 +1,6 @@
 "use strict";
 import { Model } from "sequelize";
-
+import Sequelize from "sequelize";
 export default (sequelize, DataTypes) => {
   class SeatTemplate extends Model {
     static associate(m) {
@@ -20,14 +20,18 @@ export default (sequelize, DataTypes) => {
     {
       name: { type: DataTypes.STRING(255), allowNull: false },
       meta_json: { type: DataTypes.JSON },
-      created_at: { type: DataTypes.DATE, allowNull: false },
+      created_at: {
+        type: DataTypes.DATE,
+        allowNull: false,
+        defaultValue: Sequelize.literal("CURRENT_TIMESTAMP"),
+      },
     },
     {
       sequelize,
       modelName: "SeatTemplate",
       tableName: "SeatTemplates",
       underscored: true,
-      timestamps: false, // chỉ có created_at
+      timestamps: true, // chỉ có created_at
     }
   );
 

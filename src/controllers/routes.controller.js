@@ -1,10 +1,9 @@
 import { where } from "sequelize";
-import { db } from "../../models/index.js";
-const { Routes } = db;
+import db from "../../models/index.js";
+const { Route } = db;
 
-const user = req.user;
-
-const isAuthorized = () => {
+const isAuthorized = (req) => {
+  const user = req.user;
   if (!user) {
     return false;
   }
@@ -14,12 +13,14 @@ const isAuthorized = () => {
 //===client===
 const getRoutes = async (req, res) => {
   try {
-    if (!isAuthorized) {
+    const user = req.user;
+
+    if (!user) {
       return res.status(401).json({
         message: "Unauthorized",
       });
     }
-    const routeList = await Routes.find();
+    const routeList = await Route.findAll();
     res.status(200).json({
       message: "Get routes successfully",
       routes: routeList,
@@ -37,7 +38,9 @@ const getRoutes = async (req, res) => {
 //create
 const createRoute = async (req, res) => {
   try {
-    if (!isAuthorized) {
+    const user = req.user;
+
+    if (!user) {
       return res.status(401).json({
         message: "Unauthorized",
       });
@@ -56,7 +59,7 @@ const createRoute = async (req, res) => {
       distance_km: distance_km,
       active: true,
     };
-    await Routes.create(newRoute);
+    await Route.create(newRoute);
     res.status(200).json({
       message: "Create new route successfully",
       newRoute: newRoute,
@@ -72,7 +75,9 @@ const createRoute = async (req, res) => {
 //update
 const updateRoute = async (req, res) => {
   try {
-    if (!isAuthorized) {
+    const user = req.user;
+
+    if (!user) {
       return res.status(401).json({
         message: "Unauthorized",
       });
@@ -80,7 +85,7 @@ const updateRoute = async (req, res) => {
     const { routeId } = req.params;
     const { origin, destination, distance_km, eta_minutes, isActive } =
       req.body;
-    const pickedRoute = Routes.findOne({ where: { id: routeId } });
+    const pickedRoute =await  Route.findOne({ where: { id: routeId } });
     if (!pickedRoute) {
       return res.status(404).json({
         message: "Counldn't find this route",
@@ -93,7 +98,7 @@ const updateRoute = async (req, res) => {
     if (eta_minutes) pickedRoute.eta_minutes = eta_minutes;
     if (isActive) pickedRoute.active = isActive;
 
-    await Routes.update(
+    await Route.update(
       {
         origin: pickedRoute.origin,
         destination: pickedRoute.destination,
@@ -121,19 +126,21 @@ const updateRoute = async (req, res) => {
 //delete route
 const deleteRoute = async (req, res) => {
   try {
-    if (!isAuthorized) {
+    const user = req.user;
+
+    if (!user) {
       return res.status(401).json({
         message: "Unauthorized",
       });
     }
     const { routeId } = req.params;
-    const pickedRoute = Routes.findOne({ where: { id: routeId } });
+    const pickedRoute = await Route.findOne({ where: { id: routeId } });
     if (!pickedRoute) {
       return res.status(404).json({
         message: `This route doesn't exist`,
       });
     }
-    await Routes.delete({
+    await Route.destroy({
       where: {
         id: pickedRoute.id,
       },

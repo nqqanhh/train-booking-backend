@@ -1,5 +1,5 @@
 import { Router } from "express";
-import passengerProfileController from "../controllers/passengerprofile.controller";
+import passengerProfileController from "../controllers/passengerprofile.controller.js";
 
 const passengerProfileRouter = Router();
 
@@ -9,11 +9,11 @@ passengerProfileRouter.post(
   passengerProfileController.createPassengerProfile
 );
 passengerProfileRouter.post(
-  "/update",
+  "/update/:passengerProfileId",
   passengerProfileController.updatePassengerProfile
 );
 passengerProfileRouter.post(
-  "/delete",
+  "/delete/:passengerProfileId",
   passengerProfileController.deletePassengerProfile
 );
 

@@ -35,8 +35,7 @@ export default (sequelize, DataTypes) => {
         defaultValue: "scheduled",
       },
       seat_template_id: { type: DataTypes.BIGINT, allowNull: false },
-      created_at: { type: DataTypes.DATE, allowNull: false },
-      updated_at: { type: DataTypes.DATE, allowNull: false },
+      
     },
     {
       sequelize,

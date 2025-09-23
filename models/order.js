@@ -37,15 +37,15 @@ export default (sequelize, DataTypes) => {
         allowNull: false,
         defaultValue: 0,
       },
-      created_at: { type: DataTypes.DATE, allowNull: false },
-      updated_at: { type: DataTypes.DATE, allowNull: false },
+      // created_at: { type: DataTypes.DATE, allowNull: false },
+      // updated_at: { type: DataTypes.DATE, allowNull: false },
     },
     {
       sequelize,
       modelName: "Order",
       tableName: "Orders",
-      underscored: true,
-      timestamps: false,
+      underscored: false,
+      timestamps: true,
     }
   );
 

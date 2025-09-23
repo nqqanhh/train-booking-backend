@@ -19,14 +19,15 @@ export default (sequelize, DataTypes) => {
         allowNull: false,
       },
       raw_payload: { type: DataTypes.JSON },
-      created_at: { type: DataTypes.DATE, allowNull: false },
     },
     {
       sequelize,
       modelName: "Payment",
       tableName: "Payments",
-      underscored: true,
-      timestamps: false,
+      timestamps: true, // bật timestamps
+      createdAt: "createdAt", // map đúng tên cột trong DB
+      updatedAt: "updatedAt", // map đúng tên cột trong DB
+      underscored: false, // vì đang dùng camelCase
     }
   );
 
