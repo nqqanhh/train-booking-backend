@@ -89,16 +89,13 @@ const login = async (req, res) => {
     const payload = {
       id: user.id,
       full_name: user.full_name,
-      phone: user?.phone || "Chua co sdt",
-      email: user?.email || "Chua co email",
+      phone: user.phone ,
+      email: user.email ,
       role: user.role,
       status: user.status,
     };
     const access_token = signAccessToken(payload);
-    const refresh_token =
-      typeof signRefreshToken === "function"
-        ? signRefreshToken(payload)
-        : undefined;
+    const refresh_token = signRefreshToken?.(payload);
 
     return res.status(200).json({
       message: "Đăng nhập thành công",
@@ -113,7 +110,7 @@ const login = async (req, res) => {
     });
     return res.status(500).json({
       message: "Lỗi server",
-      detail: error?.original?.sqlMessage || error.message,
+      detail: error.message,
     });
   }
 };
@@ -123,7 +120,7 @@ const changePassword = async (req, res) => {
 
     const { oldPass, newPass } = req.body;
     if (!oldPass || !newPass)
-      return res.status(404).json({
+      return res.status(400).json({
         message: "Missing credentials",
       });
     const pickUser = User.findOne({
@@ -143,7 +140,7 @@ const changePassword = async (req, res) => {
   } catch (error) {
     res.status(500).json({
       message: "Internal error " + error.message,
-      sqlMessage: error.sql,
+
     });
   }
 };

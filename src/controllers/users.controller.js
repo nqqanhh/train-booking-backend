@@ -12,10 +12,6 @@ const getMyProfile = async (req, res) => {
 
 const updateMyProfile = async (req, res) => {
   try {
-    const user = req.user;
-    if (!user) {
-      return res.status(401).json({ message: "Unauthorized" });
-    }
     const { fullName, email, phone } = req.body;
     // Update user fields
     if (fullName) user.full_name = fullName;
@@ -36,10 +32,6 @@ const updateMyProfile = async (req, res) => {
 
 const changePassword = async (req, res) => {
   try {
-    const user = req.user;
-    if (!user) {
-      return res.status(401).json({ message: "Unauthorized" });
-    }
     const { oldPass, newPass } = req.body;
     if (!oldPass || !newPass)
       return res.status(404).json({
