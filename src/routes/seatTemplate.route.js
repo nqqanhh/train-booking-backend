@@ -9,7 +9,7 @@ seatTemplateRouter.post(
   seatTemplateController.createTemplate
 );
 seatTemplateRouter.patch(
-  "/update-template/:id",
+  "/:id",
   seatTemplateController.updateSeatTemplate
 );
 seatTemplateRouter.post(

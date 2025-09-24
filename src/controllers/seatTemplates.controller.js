@@ -184,8 +184,12 @@ const upsertTemplateSeats = async (req, res) => {
 
 const updateOneSeat = async (req, res) => {
   try {
-    const { id, seatId } = req.params;
-    // const { seat_class, base_price, pos_row, pos_col } = req.body;
+    const id = Number(req.params.id);
+    const seatId = Number(req.params.seatId);
+
+    if (!Number.isFinite(id) || !Number.isFinite(seatId)) {
+      return res.status(400).json({ message: "Invalid id/seatId" });
+    }
     const [count] = await SeatTemplateSeat.update(
       {
         seat_class: req.body?.seat_class,

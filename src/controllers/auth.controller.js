@@ -17,7 +17,7 @@ const toSafeUser = (u) => ({
 
 const signUp = async (req, res) => {
   try {
-    const { fullName, email, phone, password } = req.body;
+    const { fullName, email, phone, password, role } = req.body;
     const isExist = await User.findOne({ where: { email } });
     if (isExist)
       return res.json({
@@ -29,6 +29,7 @@ const signUp = async (req, res) => {
       email,
       phone,
       password_hash: password_hash,
+      role: role ?? "user"
     };
     await User.create(newUser);
     const getUserInfo = await User.findOne({ where: { email: email } });

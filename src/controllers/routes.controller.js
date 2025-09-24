@@ -13,17 +13,17 @@ const isAuthorized = (req) => {
 //===client===
 const getRoutes = async (req, res) => {
   try {
-    const user = req.user;
+    // const user = req.user;
 
-    if (!user) {
-      return res.status(401).json({
-        message: "Unauthorized",
-      });
-    }
+    // if (!user) {
+    //   return res.status(401).json({
+    //     message: "Unauthorized",
+    //   });
+    // }
     const routeList = await Route.findAll();
     res.status(200).json({
       message: "Get routes successfully",
-      routes: routeList,
+      items: routeList,
     });
   } catch (error) {
     res.status(500).json({
@@ -38,13 +38,13 @@ const getRoutes = async (req, res) => {
 //create
 const createRoute = async (req, res) => {
   try {
-    const user = req.user;
+    // const user = req.user;
 
-    if (!user) {
-      return res.status(401).json({
-        message: "Unauthorized",
-      });
-    }
+    // if (!user) {
+    //   return res.status(401).json({
+    //     message: "Unauthorized",
+    //   });
+    // }
 
     const { origin, destination, eta_minutes, distance_km } = req.body;
     if (!origin || !destination || !eta_minutes || !distance_km) {
@@ -75,17 +75,17 @@ const createRoute = async (req, res) => {
 //update
 const updateRoute = async (req, res) => {
   try {
-    const user = req.user;
+    // const user = req.user;
 
-    if (!user) {
-      return res.status(401).json({
-        message: "Unauthorized",
-      });
-    }
+    // if (!user) {
+    //   return res.status(401).json({
+    //     message: "Unauthorized",
+    //   });
+    // }
     const { routeId } = req.params;
     const { origin, destination, distance_km, eta_minutes, isActive } =
       req.body;
-    const pickedRoute =await  Route.findOne({ where: { id: routeId } });
+    const pickedRoute = await Route.findOne({ where: { id: routeId } });
     if (!pickedRoute) {
       return res.status(404).json({
         message: "Counldn't find this route",
@@ -96,7 +96,7 @@ const updateRoute = async (req, res) => {
     if (destination) pickedRoute.destination = destination;
     if (distance_km) pickedRoute.distance_km = distance_km;
     if (eta_minutes) pickedRoute.eta_minutes = eta_minutes;
-    if (isActive) pickedRoute.active = isActive;
+    if (isActive !== undefined) pickedRoute.active = isActive;
 
     await Route.update(
       {
@@ -126,13 +126,13 @@ const updateRoute = async (req, res) => {
 //delete route
 const deleteRoute = async (req, res) => {
   try {
-    const user = req.user;
+    // const user = req.user;
 
-    if (!user) {
-      return res.status(401).json({
-        message: "Unauthorized",
-      });
-    }
+    // if (!user) {
+    //   return res.status(401).json({
+    //     message: "Unauthorized",
+    //   });
+    // }
     const { routeId } = req.params;
     const pickedRoute = await Route.findOne({ where: { id: routeId } });
     if (!pickedRoute) {

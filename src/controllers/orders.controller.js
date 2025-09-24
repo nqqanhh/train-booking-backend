@@ -111,6 +111,14 @@ const createOrder = async (req, res) => {
   }
 };
 
+const getAllOrders = async (req, res) => {
+  try {
+    const items = await Order.findAll();
+    res.status(200).json({ message: "OK", items });
+  } catch (error) {
+    res.status(500).json({ message: "Internal error", detail: error.message });
+  }
+};
 const getOrderDetail = async (req, res) => {
   try {
     const { id } = req.params;
@@ -179,6 +187,6 @@ const getOrderDetail = async (req, res) => {
     });
   }
 };
-const orderController = { previewOrder, createOrder, getOrderDetail };
+const orderController = { previewOrder, createOrder, getOrderDetail, getAllOrders };
 
 export default orderController;
