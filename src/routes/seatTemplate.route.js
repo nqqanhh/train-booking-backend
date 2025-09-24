@@ -3,12 +3,12 @@ import seatTemplateController from "../controllers/seatTemplates.controller.js";
 const seatTemplateRouter = Router();
 
 seatTemplateRouter.get("/", seatTemplateController.getTemplateList);
-seatTemplateRouter.get("/:id", seatTemplateController.getTemplateDetail);
+seatTemplateRouter.get("/:id/seats", seatTemplateController.getTemplateDetail);
 seatTemplateRouter.post(
   "/create-template",
   seatTemplateController.createTemplate
 );
-seatTemplateRouter.post(
+seatTemplateRouter.patch(
   "/update-template/:id",
   seatTemplateController.updateSeatTemplate
 );

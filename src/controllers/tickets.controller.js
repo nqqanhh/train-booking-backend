@@ -65,7 +65,6 @@ export async function generateTickets(orderId, tExternal = null) {
     throw e;
   }
 }
-// src/controllers/tickets.controller.js
 export const validateTicket = async (req, res) => {
   try {
     const { qr_payload } = req.body;

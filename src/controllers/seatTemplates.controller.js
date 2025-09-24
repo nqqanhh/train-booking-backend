@@ -72,13 +72,19 @@ const getTemplateDetail = async (req, res) => {
 const updateSeatTemplate = async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, meta_json } = req.body;
-    const [count] = await SeatTemplate.update(
-      { name: name, meta_json: meta_json },
-      { where: { id } }
-    );
-    if (!count) return res.status(404).json({ message: "Template not found" });
+    const { name, rows, cols } = req.body;
+    if (!rows || !cols) {
+      return res.status(400).json({ message: "rows & cols required" });
+    }
+    // const [count] = await SeatTemplate.update(
+    //   { name: name, meta_json: meta_json },
+    //   { where: { id } }
+    // );
+    // if (!count) return res.status(404).json({ message: "Template not found" });
     const tpl = await SeatTemplate.findByPk(id);
+    if (!tpl) return res.status(404).json({ message: "Template not found" });
+    tpl.meta_json = { ...(tpl.meta_json || {}), rows, cols };
+    await tpl.save();
     res.status(201).json({
       message: "Template updated",
       template: tpl,
@@ -191,7 +197,7 @@ const updateOneSeat = async (req, res) => {
     );
     if (!count) return res.status(404).json({ message: "Seat not found" });
     const seat = await SeatTemplateSeat.findOne({
-      where: { template_id: id,id: seatId },
+      where: { template_id: id, id: seatId },
     });
     res.status(200).json({
       message: "Update seat successfully",

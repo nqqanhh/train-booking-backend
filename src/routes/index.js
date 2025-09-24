@@ -29,9 +29,9 @@ router.use("/trips", tripsRouter);
 router.use("/tripseats", authorizationToken, tripSeatsRouter);
 router.use("/tickets", authorizationToken, ticketsRouter);
 router.use("/payments", paymentsRouter);
-router.use("/orders", authorizationToken,ordersRouter);
+router.use("/orders", authorizationToken, ordersRouter);
 router.use("/notifications", authorizationToken, notificationsRouter);
-router.use("/routes", authorizationToken, routesRouter);
+router.use("/routes", routesRouter);
 router.use("/passenger-profile", authorizationToken, passengerProfileRouter);
 //
 router.use("/seat-templates", seatTemplateRouter);
