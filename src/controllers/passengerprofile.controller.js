@@ -40,7 +40,7 @@ const createPassengerProfile = async (req, res) => {
     }
     const { fullName, id_no, dob, phone } = req.body;
     if (!fullName || !id_no || !dob || !phone)
-      return res.status(404).json({
+      return res.status(400).json({
         message: "Missing credentials",
       });
     const newPassenger = {

@@ -27,13 +27,13 @@ module.exports = {
       raw_payload: {
         type: Sequelize.JSON,
       },
-      createdAt: {
-        allowNull: true,
+      created_at: {
+        allowNull: false,
         type: Sequelize.DATE,
         defaultValue: Sequelize.literal("CURRENT_TIMESTAMP"),
       },
-      updatedAt: {
-        allowNull: true,
+      updated_at: {
+        allowNull: false,
         type: Sequelize.DATE,
         defaultValue: Sequelize.literal(
           "CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP"

@@ -4,6 +4,12 @@ import { Model } from "sequelize";
 export default (sequelize, DataTypes) => {
   class Trip extends Model {
     static associate(m) {
+      Trip.hasMany(m.Carriage, {
+        foreignKey: "trip_id",
+        as: "carriages",
+        onDelete: "CASCADE",
+      });
+
       Trip.belongsTo(m.Route, { foreignKey: "route_id", as: "route" });
       Trip.belongsTo(m.SeatTemplate, {
         foreignKey: "seat_template_id",
@@ -13,11 +19,6 @@ export default (sequelize, DataTypes) => {
       Trip.hasMany(m.TripSeatPricing, {
         foreignKey: "trip_id",
         as: "pricing",
-        onDelete: "CASCADE",
-      });
-      Trip.hasMany(m.TripSeat, {
-        foreignKey: "trip_id",
-        as: "sold_seats",
         onDelete: "CASCADE",
       });
     }
@@ -35,14 +36,13 @@ export default (sequelize, DataTypes) => {
         defaultValue: "scheduled",
       },
       seat_template_id: { type: DataTypes.BIGINT, allowNull: false },
-      
     },
     {
       sequelize,
       modelName: "Trip",
       tableName: "Trips",
       underscored: true,
-      timestamps: false,
+      timestamps: true,
     }
   );
 

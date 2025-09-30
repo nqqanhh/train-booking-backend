@@ -15,6 +15,7 @@ import passengerProfileRouter from "./passengerprofile.route.js";
 import authorizationToken from "../middlewares/auth.middleware.js";
 import seatTemplateRouter from "./seatTemplate.route.js";
 import myRouter from "./my.route.js";
+import carriageRouter from "./carriage.route.js";
 const router = Router();
 //
 router.get("/", (req, res) => {
@@ -37,5 +38,7 @@ router.use("/passenger-profile", authorizationToken, passengerProfileRouter);
 router.use("/seat-templates", seatTemplateRouter);
 //get my <something>
 router.use("/get-my", myRouter);
+//carriages
+router.use("/carriages", carriageRouter);
 //
 export default router;

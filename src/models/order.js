@@ -37,15 +37,15 @@ export default (sequelize, DataTypes) => {
         allowNull: false,
         defaultValue: 0,
       },
-      // created_at: { type: DataTypes.DATE, allowNull: false },
-      // updated_at: { type: DataTypes.DATE, allowNull: false },
     },
     {
       sequelize,
       modelName: "Order",
       tableName: "Orders",
-      underscored: false,
-      timestamps: true,
+      timestamps: true, // sẽ dùng createdAt/updatedAt
+      underscored: true, // 👈 BẮT BUỘC camelCase
+      createdAt: "createdAt", // (tường minh, để khỏi lệch)
+      updatedAt: "updatedAt",
     }
   );
 

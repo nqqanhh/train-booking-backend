@@ -25,10 +25,10 @@ let sequelize;
 if (config.use_env_variable) {
   sequelize = new Sequelize(process.env[config.use_env_variable], {
     ...config,
-    logging: false,
+    logging: console.log,
     timezone: "+07:00",
     define: {
-      underscored: false,
+      underscored: true,
       freezeTableName: true,
     },
     dialectOptions: {

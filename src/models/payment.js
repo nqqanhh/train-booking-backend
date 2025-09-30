@@ -27,7 +27,7 @@ export default (sequelize, DataTypes) => {
       timestamps: true, // bật timestamps
       createdAt: "createdAt", // map đúng tên cột trong DB
       updatedAt: "updatedAt", // map đúng tên cột trong DB
-      underscored: false, // vì đang dùng camelCase
+      underscored: true, // vì đang dùng camelCase
     }
   );
 

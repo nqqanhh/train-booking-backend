@@ -25,7 +25,7 @@ export default (sequelize, DataTypes) => {
       modelName: "PassengerProfile",
       tableName: "PassengerProfiles",
       underscored: true,
-      timestamps: false,
+      timestamps: true,
     }
   );
 

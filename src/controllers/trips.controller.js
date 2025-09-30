@@ -1,235 +1,189 @@
+// src/controllers/trips.controller.js
 import db from "../models/index.js";
-const { Trip, Route, SeatTemplate, TripSeat, TripSeatPricing } = db;
-import { parseTod, parseYMD, yyyymmdd } from "../utils/format-date-time.js";
-//===user===
+const { Trip, Route, SeatTemplateSeat, Carriage, TripSeat } = db;
+
+// === user ===
 const getTrips = async (req, res) => {
   try {
-    const { origin, destination, date } = req.query;
-    const where = { status: "scheduled" };
-    if (date) {
-      const start = new Date(date);
-      const end = new Date(date);
-      end.setDate(end.getDate() + 1);
-      where.departure_time = {
-        [db.Sequelize.Op.Between]: [start, end],
-      };
-    }
     const trips = await Trip.findAll({
-      where,
       include: [
         {
           model: Route,
           as: "route",
-          where: {
-            ...(origin ? { origin } : {}),
-            ...(destination ? { destination } : {}),
-          },
+          attributes: ["id", "origin", "destination"],
         },
       ],
       order: [["departure_time", "ASC"]],
     });
-    res.status(200).json({
-      message: "Get trips successfuly",
-      trips: trips,
-    });
-  } catch (error) {
-    res.status(500).json({
-      message: "Internal error: " + error.message,
-      sqlMessage: error.sql,
-    });
+
+    // (tuỳ nhu cầu) đếm số toa cho mỗi trip
+    const tripIds = trips.map((t) => t.id);
+    let carriageCount = {};
+    if (tripIds.length) {
+      const rows = await Carriage.findAll({
+        where: { trip_id: tripIds },
+        attributes: ["trip_id"],
+        raw: true,
+      });
+      // bạn có thể build carriageCount[trip_id] nếu FE cần
+    }
+
+    return res.json({ trips });
+  } catch (e) {
+    return res
+      .status(500)
+      .json({ message: "Internal error", detail: e.message });
   }
 };
 
-//===admin===
-
-//create trip
+// === admin ===
 const createTrip = async (req, res) => {
+  const t = await db.sequelize.transaction();
   try {
     const {
       route_id,
-      seat_template_id,
       departure_time,
       arrival_time,
       vehicle_no,
+      status = "scheduled",
+      seat_template_id,
     } = req.body;
-
     if (
       !route_id ||
-      !seat_template_id ||
       !departure_time ||
       !arrival_time ||
-      !vehicle_no
+      !vehicle_no ||
+      !seat_template_id
     ) {
+      await t.rollback();
       return res.status(400).json({
-        message: "Missing credentials",
+        message:
+          "route_id, seat_template_id, departure_time, arrival_time, vehicle_no required",
       });
     }
-    // (Khuyến nghị) kiểm tra tồn tại để tránh lỗi FK khó đọc
-    const [route, template] = await Promise.all([
-      Route.findByPk(route_id),
-      SeatTemplate.findByPk(seat_template_id),
-    ]);
-    if (!route) return res.status(404).json({ message: "Route not found" });
-    if (!template)
-      return res.status(404).json({ message: "Seat template not found" });
 
-    const newTrip = {
-      route_id,
-      seat_template_id,
-      departure_time: new Date(departure_time),
-      arrival_time: new Date(arrival_time),
-      vehicle_no,
-      status: "scheduled",
-    };
-    await Trip.create(newTrip);
-    res.status(200).json({
-      message: "Create new trip successfully",
-      trip: newTrip,
+    const trip = await Trip.create(
+      {
+        route_id,
+        seat_template_id,
+        departure_time,
+        arrival_time,
+        vehicle_no,
+        status,
+      },
+      { transaction: t }
+    );
+
+    // (tuỳ chọn) tạo sẵn 1 Carriage '1' cho trip nếu chưa có migration tự tạo
+    const [carriage] = await Carriage.findOrCreate({
+      where: { trip_id: trip.id, carriage_no: "1" },
+      defaults: { trip_id: trip.id, seat_template_id, carriage_no: "1" },
+      transaction: t,
     });
-  } catch (error) {
-    res.status(500).json({
-      message: "Internal error: " + error.message,
-      sqlMessage: error.sql,
-    });
+
+    await t.commit();
+    return res.status(201).json({ message: "Trip created", trip, carriage });
+  } catch (e) {
+    await t.rollback();
+    return res
+      .status(500)
+      .json({ message: "Internal error", detail: e.message });
   }
 };
 
-//update trip
 const updateTrip = async (req, res) => {
   try {
-    const { tripId } = req.params;
-    const {
-      route_id,
-      seat_template_id,
-      departure_time,
-      arrival_time,
-      vehicle_no,
-    } = req.body;
-    const pickedTrip = await Trip.findOne({ where: { id: tripId } });
-    if (!pickedTrip) {
-      return res.status(404).json({ message: "Couldn't find this trip" });
-    }
-    if (route_id) pickedTrip.route_id = route_id;
-    if (seat_template_id) pickedTrip.seat_template_id = seat_template_id;
-    if (departure_time) pickedTrip.departure_time = departure_time;
-    if (arrival_time) pickedTrip.arrival_time = arrival_time;
-    if (vehicle_no) pickedTrip.vehicle_no = vehicle_no;
-
-    await Trip.update(pickedTrip);
-    res.status(200).json({
-      message: "Trip updated successfully",
-      updatedTrip: pickedTrip,
-    });
-  } catch (error) {
-    res.status(500).json({
-      message: "Internal error: " + error.message,
-      sqlMessage: error.sql,
-    });
+    const { id } = req.params;
+    const [count] = await Trip.update(
+      {
+        route_id: req.body?.route_id,
+        seat_template_id: req.body?.seat_template_id,
+        departure_time: req.body?.departure_time,
+        arrival_time: req.body?.arrival_time,
+        vehicle_no: req.body?.vehicle_no,
+        status: req.body?.status,
+      },
+      { where: { id } }
+    );
+    if (!count) return res.status(404).json({ message: "Trip not found" });
+    const trip = await Trip.findByPk(id);
+    return res.json({ message: "Trip updated", trip });
+  } catch (e) {
+    return res
+      .status(500)
+      .json({ message: "Internal error", detail: e.message });
   }
 };
 
-//delete trip
 const deleteTrip = async (req, res) => {
   try {
-    const { tripId } = req.params;
-    const count = await Trip.destroy({ where: { id: tripId } });
+    const { id } = req.params;
+    const count = await Trip.destroy({ where: { id } }); // CASCADE sẽ xoá Carriages & TripSeats
     if (!count) return res.status(404).json({ message: "Trip not found" });
-    res.status(200).json({
-      message: "Trip deleted successfully",
-    });
-  } catch (error) {
-    res.status(500).json({
-      message: "Internal error: " + error.message,
-      sqlMessage: error.sql,
-    });
+    return res.json({ message: "Trip deleted" });
+  } catch (e) {
+    return res
+      .status(500)
+      .json({ message: "Internal error", detail: e.message });
   }
 };
 
-// const getSeatMap = async (req, res) => {
-//   try {
-//     const { id } = req.params; //tripId
-//     const trip = await Trip.findByPk(id);
-//     if (!id) return res.status(404).json({ message: "Trip not found" });
-
-//     const [tplSeats, overrides, sold] = await Promise.all([
-//       SeatTemplate.findAll({
-//         where: { id: trip.seat_template_id },
-//         raw: true,
-//       }),
-//       TripSeatPricing.findAll({ where: { trip_id: id }, raw: true }),
-//       TripSeat.findAll({
-//         where: { trip_id: id },
-//         attributes: ["seat_code"],
-//         raw: true,
-//       }),
-//     ]);
-
-//     const overrideMap = new Map(
-//       overrides.map((o) => [o.seat_code, Number(o.price)])
-//     );
-//     const soldSet = new Set(sold.map((s) => s.seat_code));
-//     const seats = tplSeats.map((s) => ({
-//       seat_code: s.seat_code,
-//       class: s.seat_class,
-//       row: s.pos_row,
-//       col: s.pos_col,
-//       price: overrideMap.get(s.seat_code) ?? Number(s.base_price),
-//       sold: soldSet.has(s.seat_code),
-//     }));
-
-//     res.status(200).json({
-//       message: "OK",
-//       trip_id: id,
-//       seats,
-//     });
-//   } catch (error) {
-//     res.status(500).json({
-//       message: "Internal error: " + error.message,
-//       sqlMessage: error.sql,
-//     });
-//   }
-// };
-
-//ko can TripSeatPricing
+/** GET /trips/:id/seatmap */
 const getSeatMap = async (req, res) => {
-  const { id } = req.params;
-  const trip = await db.Trip.findByPk(id);
-  if (!trip) return res.status(404).json({ message: "Trip not found" });
+  try {
+    const { id } = req.params; // tripId
+    const trip = await Trip.findByPk(id);
+    if (!trip) return res.status(404).json({ message: "Trip not found" });
 
-  const [tplSeats, sold] = await Promise.all([
-    db.SeatTemplateSeat.findAll({
-      where: { template_id: trip.seat_template_id },
-      raw: true,
-      order: [
-        ["pos_row", "ASC"],
-        ["pos_col", "ASC"],
-      ],
-    }),
-    db.TripSeat.findAll({
-      where: { trip_id: id },
-      attributes: ["seat_code"],
-      raw: true,
-    }),
-  ]);
+    // Lấy ghế theo template + ghế đã bán theo toa của trip
+    const [tplSeats, sold] = await Promise.all([
+      SeatTemplateSeat.findAll({
+        where: { template_id: trip.seat_template_id },
+        raw: true,
+        order: [
+          ["pos_row", "ASC"],
+          ["pos_col", "ASC"],
+        ],
+      }),
+      TripSeat.findAll({
+        include: [
+          {
+            model: Carriage,
+            as: "carriage",
+            attributes: [],
+            where: { trip_id: id },
+          },
+        ],
+        attributes: ["seat_code"],
+        raw: true,
+      }),
+    ]);
 
-  const soldSet = new Set(sold.map((s) => s.seat_code));
+    const soldSet = new Set(sold.map((s) => s.seat_code));
 
-  const seats = tplSeats.map((s) => ({
-    seat_code: s.seat_code,
-    class: s.seat_class,
-    row: s.pos_row,
-    col: s.pos_col,
-    price: Number(s.base_price),
-    sold: soldSet.has(s.seat_code),
-  }));
+    // Kết quả tối giản đủ để FE render lưới ghế
+    const seats = tplSeats.map((s) => ({
+      seat_code: s.seat_code,
+      class: s.seat_class, // "vip" | "standard"
+      row: s.pos_row,
+      col: s.pos_col,
+      price: Number(s.base_price), // nếu có bảng override giá thì map thêm tại đây
+      sold: soldSet.has(s.seat_code),
+    }));
 
-  return res.json({ trip_id: id, seats });
+    return res.json({ trip_id: Number(id), seats });
+  } catch (error) {
+    return res
+      .status(500)
+      .json({ message: "Internal error: " + error.message });
+  }
 };
+
 const tripController = {
   getTrips,
   createTrip,
   updateTrip,
   deleteTrip,
-  getSeatMap
+  getSeatMap,
 };
 export default tripController;

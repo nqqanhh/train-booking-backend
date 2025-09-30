@@ -43,7 +43,7 @@ export default (sequelize, DataTypes) => {
       sequelize,
       modelName: "User",
       tableName: "Users",
-      underscored: false,
+      underscored: true,
       timestamps: true,
     }
   );

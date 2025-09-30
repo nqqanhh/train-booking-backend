@@ -29,7 +29,7 @@ const signUp = async (req, res) => {
       email,
       phone,
       password_hash: password_hash,
-      role: role ?? "user"
+      role: role ?? "user",
     };
     await User.create(newUser);
     const getUserInfo = await User.findOne({ where: { email: email } });
@@ -90,8 +90,8 @@ const login = async (req, res) => {
     const payload = {
       id: user.id,
       full_name: user.full_name,
-      phone: user.phone ,
-      email: user.email ,
+      phone: user.phone,
+      email: user.email,
       role: user.role,
       status: user.status,
     };
@@ -118,7 +118,6 @@ const login = async (req, res) => {
 
 const changePassword = async (req, res) => {
   try {
-
     const { oldPass, newPass } = req.body;
     if (!oldPass || !newPass)
       return res.status(400).json({
@@ -141,7 +140,6 @@ const changePassword = async (req, res) => {
   } catch (error) {
     res.status(500).json({
       message: "Internal error " + error.message,
-
     });
   }
 };

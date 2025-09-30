@@ -28,7 +28,7 @@ export default (sequelize, DataTypes) => {
       modelName: "Ticket",
       tableName: "Tickets",
       underscored: true,
-      timestamps: false,
+      timestamps: true,
     }
   );
 

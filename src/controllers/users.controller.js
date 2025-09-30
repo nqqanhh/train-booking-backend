@@ -1,63 +1,88 @@
+// src/controllers/users.controller.js
 import { compare, hash } from "bcrypt";
 import db from "../models/index.js";
 const { User } = db;
+
 const getMyProfile = async (req, res) => {
-  // Assuming req.user is populated by authentication middleware
-  const user = req.user;
-  if (!user) {
-    return res.status(401).json({ message: "Unauthorized" });
-  }
-  res.status(200).json({ user });
+  if (!req.user) return res.status(401).json({ message: "Unauthorized" });
+  // Có thể nạp lại từ DB để có fields mới nhất
+  const me = await User.findByPk(req.user.id, {
+    attributes: [
+      "id",
+      "full_name",
+      "email",
+      "phone",
+      "role",
+      "status",
+      "createdAt",
+      "updatedAt",
+    ],
+  });
+  return res.status(200).json({ user: me });
 };
 
 const updateMyProfile = async (req, res) => {
   try {
-    const { fullName, email, phone } = req.body;
-    // Update user fields
-    if (fullName) user.full_name = fullName;
-    if (email) user.email = email;
-    if (phone) user.phone = phone;
-    await User.update(
-      { full_name: user.full_name, phone: user.phone, email: user.email },
-      { where: { id: req.user.id } }
-    );
-    res.status(200).json({ message: "Profile updated successfully", user });
+    const { fullName, email, phone } = req.body || {};
+    const user = await User.findByPk(req.user.id);
+    if (!user) return res.status(404).json({ message: "User not found" });
+
+    if (typeof fullName !== "undefined") user.full_name = fullName;
+    if (typeof email !== "undefined")
+      user.email = String(email).trim().toLowerCase();
+    if (typeof phone !== "undefined") user.phone = String(phone).trim();
+
+    await user.save();
+    return res
+      .status(200)
+      .json({ message: "Profile updated successfully", user });
   } catch (error) {
-    res.status(500).json({
-      message: "Internal error: " + error.message,
-      sqlMessage: error.sql,
-    });
+    return res
+      .status(500)
+      .json({ message: "Internal error: " + error.message });
   }
 };
 
 const changePassword = async (req, res) => {
   try {
-    const { oldPass, newPass } = req.body;
+    const { oldPass, newPass } = req.body || {};
     if (!oldPass || !newPass)
-      return res.status(404).json({
-        message: "Missing credentials",
-      });
-    const pickUser = User.findOne({
-      where: {
-        email: user.email,
-      },
-    });
-    const isCorrectPassword = await compare(oldPass, pickUser.password_hash);
+      return res.status(400).json({ message: "Missing credentials" });
 
-    if (isCorrectPassword) {
-      const newHashPassword = await hash(newPass);
-      User.update(
-        { password_hash: newHashPassword },
-        { where: { id: user.id } }
-      );
-    }
+    const user = await User.findByPk(req.user.id);
+    if (!user) return res.status(404).json({ message: "User not found" });
+
+    const ok = await compare(oldPass, user.password_hash);
+    if (!ok)
+      return res.status(400).json({ message: "Current password is incorrect" });
+
+    const newHash = await hash(newPass, 10);
+    user.password_hash = newHash;
+    await user.save();
+
+    return res.json({ message: "Password changed successfully" });
   } catch (error) {
-    res.status(500).json({
-      message: "Internal error " + error.message,
-      sqlMessage: error.sql,
-    });
+    return res.status(500).json({ message: "Internal error " + error.message });
   }
 };
 
-const userController = { getMyProfile, updateMyProfile, changePassword };
+const getAllUsers = async (req, res) => {
+  try {
+    const users = await User.findAll();
+    res.status(200).json({
+      message: "OK",
+      users,
+    });
+  } catch (error) {
+    res.status(500).json({
+      message: "Internal error " + error.message,
+    });
+  }
+};
+const userController = {
+  getMyProfile,
+  updateMyProfile,
+  changePassword,
+  getAllUsers,
+};
 export default userController;

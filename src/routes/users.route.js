@@ -1,9 +1,11 @@
+// src/routes/users.route.js
 import { Router } from "express";
 import userController from "../controllers/users.controller.js";
 
 const usersRouter = Router();
 
-usersRouter.get("/", userController.getMyProfile);
-usersRouter.post("/update", userController.updateMyProfile);
-usersRouter.post("/change-password", userController.changePassword);
+usersRouter.get("/me", userController.getMyProfile);
+usersRouter.get("/users", userController.getAllUsers);
+usersRouter.patch("/me", userController.updateMyProfile);
+usersRouter.patch("/me/password", userController.changePassword);
 export default usersRouter;

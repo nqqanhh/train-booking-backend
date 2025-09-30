@@ -27,12 +27,12 @@ module.exports = {
       seat_template_id: {
         type: Sequelize.BIGINT,
       },
-      createdAt: {
+      created_at: {
         allowNull: false,
         type: Sequelize.DATE,
         defaultValue: Sequelize.literal("CURRENT_TIMESTAMP"),
       },
-      updatedAt: {
+      updated_at: {
         allowNull: false,
         type: Sequelize.DATE,
         defaultValue: Sequelize.literal(

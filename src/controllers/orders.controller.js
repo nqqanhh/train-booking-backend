@@ -1,4 +1,6 @@
+import { Op } from "sequelize";
 import db from "../models/index.js";
+
 const {
   sequelize,
   Trip,
@@ -8,6 +10,10 @@ const {
   OrderItem,
   User,
   Payment,
+  PassengerProfile,
+  Ticket,
+  Carriage,
+  TripSeatPricing,
 } = db;
 
 const buildPriceMaps = async (trip_id) => {
@@ -58,56 +64,173 @@ const previewOrder = async (req, res) => {
 };
 
 const createOrder = async (req, res) => {
-  const t = await sequelize.transaction();
+  const t = await db.sequelize.transaction();
   try {
-    const user_id = req.user.id;
-    const { trip_id, items = [] } = req.body || {};
-    if (!trip_id || !items.length) {
+    const { user_id, items = [] } = req.body || {};
+
+    if (!user_id || !Array.isArray(items) || items.length === 0) {
       await t.rollback();
-      return res.status(400).json({ message: "Missing trip_id/items" });
+      return res.status(400).json({ message: "user_id & items required" });
     }
 
-    const { baseMap, soldSet } = await buildPriceMaps(trip_id);
+    // Validate dữ liệu đầu vào tối thiểu
+    for (const it of items) {
+      if (!it.trip_id || !it.seat_code) {
+        await t.rollback();
+        return res
+          .status(400)
+          .json({ message: "Each item requires trip_id & seat_code" });
+      }
+      if (it.passenger_id) {
+        const pp = await PassengerProfile.findByPk(it.passenger_id, {
+          transaction: t,
+        });
+        if (!pp) {
+          await t.rollback();
+          return res
+            .status(404)
+            .json({ message: `PassengerProfile ${it.passenger_id} not found` });
+        }
+      }
+    }
 
-    let total = 0;
-    const rows = items.map((it) => {
-      if (soldSet.has(it.seat_code))
-        throw new Error(`Seat ${it.seat_code} already sold`);
-      const price = baseMap.get(it.seat_code);
-      if (price == null)
-        throw new Error(`Seat ${it.seat_code} not found in template`);
-      total += price;
-      return {
-        trip_id,
-        seat_code: it.seat_code,
-        passenger_id: it.passenger_id,
-        price,
-      };
+    // Tập trip cần xử lý
+    const tripIds = [...new Set(items.map((x) => x.trip_id))];
+
+    // Lấy Trip (đồng thời lấy seat_template_id từ Trip)
+    const trips = await Trip.findAll({
+      where: { id: tripIds },
+      transaction: t,
+      raw: true,
     });
+    if (trips.length !== tripIds.length) {
+      await t.rollback();
+      return res.status(404).json({ message: "Some trip(s) not found" });
+    }
+    const tripMap = new Map(trips.map((tr) => [tr.id, tr]));
 
+    // Map trip_id -> [carriage_id]
+    const carriages = await Carriage.findAll({
+      where: { trip_id: tripIds },
+      attributes: ["id", "trip_id"],
+      transaction: t,
+      raw: true,
+    });
+    const carrMap = new Map(); // trip_id -> [carriage_id]
+    for (const c of carriages) {
+      if (!carrMap.has(c.trip_id)) carrMap.set(c.trip_id, []);
+      carrMap.get(c.trip_id).push(c.id);
+    }
+    for (const tripId of tripIds) {
+      const list = carrMap.get(tripId) || [];
+      if (!list.length) {
+        await t.rollback();
+        return res.status(409).json({
+          message: `Trip ${tripId} has no carriage. Seed Carriages first.`,
+        });
+      }
+    }
+
+    // Tính giá & kiểm tra ghế trống
+    let total = 0;
+    const orderItemsPayload = [];
+
+    for (const it of items) {
+      const trip = tripMap.get(it.trip_id);
+      const templateId = trip.seat_template_id;
+
+      // 1) Ghế hợp lệ trong template?
+      const tplSeat = await SeatTemplateSeat.findOne({
+        where: { template_id: templateId, seat_code: it.seat_code },
+        transaction: t,
+        raw: true,
+      });
+      if (!tplSeat) {
+        await t.rollback();
+        return res.status(404).json({
+          message: `Seat ${it.seat_code} not found in template of trip ${it.trip_id}`,
+        });
+      }
+
+      // 2) Ghế còn trống? (chưa có order_item_id) — kiểm tra qua Carriage
+      const carrIds = carrMap.get(it.trip_id);
+      const locked = await TripSeat.findOne({
+        where: {
+          carriage_id: { [Op.in]: carrIds },
+          seat_code: it.seat_code,
+          order_item_id: { [Op.ne]: null },
+        },
+        attributes: ["id"],
+        transaction: t,
+      });
+      if (locked) {
+        await t.rollback();
+        return res.status(409).json({
+          message: `Seat ${it.seat_code} on trip ${it.trip_id} already sold`,
+        });
+      }
+
+      // 3) Giá: ưu tiên TripSeatPricing (nếu có), fallback base_price của template
+      let price = Number(tplSeat.base_price || 0);
+      if (db.trip_seat_pricing) {
+        const override = await TripSeatPricing.findOne({
+          where: { trip_id: it.trip_id, seat_code: it.seat_code },
+          attributes: ["price"],
+          transaction: t,
+          raw: true,
+        });
+        if (override?.price != null) price = Number(override.price);
+      }
+      if (!(price >= 0)) {
+        await t.rollback();
+        return res
+          .status(400)
+          .json({ message: `Invalid price resolved for seat ${it.seat_code}` });
+      }
+
+      total += price;
+      orderItemsPayload.push({
+        trip_id: it.trip_id,
+        seat_code: it.seat_code,
+        passenger_id: it.passenger_id ?? null,
+        price,
+      });
+    }
+
+    // 4) Tạo Order với total_amount tính được
     const order = await Order.create(
       {
         user_id,
         status: "pending",
-        total_amount: total,
+        total_amount: total.toFixed(2), // DECIMAL(12,2) — truyền string an toàn
       },
       { transaction: t }
     );
 
-    await OrderItem.bulkCreate(
-      rows.map((r) => ({ ...r, order_id: order.id })),
-      { transaction: t }
-    );
+    // 5) Tạo OrderItems
+    for (const oi of orderItemsPayload) {
+      await OrderItem.create(
+        { ...oi, order_id: order.id },
+        {
+          transaction: t,
+          fields: ["order_id", "trip_id", "seat_code", "passenger_id", "price"],
+        }
+      );
+    }
 
     await t.commit();
-    res.status(201).json({
+    return res.status(201).json({
       message: "Order created",
       order_id: order.id,
-      total_amount: total,
+      total_amount: total.toFixed(2),
+      items: orderItemsPayload,
     });
-  } catch (e) {
+  } catch (error) {
     await t.rollback();
-    res.status(400).json({ message: "Create order failed", detail: e.message });
+    return res.status(500).json({
+      message: "create-order failed",
+      detail: error?.message || String(error),
+    });
   }
 };
 
@@ -123,70 +246,38 @@ const getOrderDetail = async (req, res) => {
   try {
     const { id } = req.params;
 
-    const order = await Order.findOne({
-      where: { id },
+    const order = await Order.findByPk(id, {
       include: [
-        {
-          model: User,
-          as: "user",
-          attributes: ["id", "full_name", "email", "phone"],
-        },
         {
           model: OrderItem,
           as: "items",
-          attributes: [
-            {
-              model: db.PassengerProfile,
-              as: "passenger",
-              attributes: ["id", "full_name", "id_no", "dob", "phone"],
-            },
-            {
-              model: db.TripSeat,
-              as: "trip_seat",
-              attributes: ["id", "trip_id", "seat_code", "sold_at"],
-            },
-            {
-              model: db.Ticket,
-              as: "ticket",
-              attributes: [
-                "id",
-                "qr_payload",
-                "status",
-                "issued_at",
-                "used_at",
-              ],
-            },
-          ],
+          include: [{ model: Ticket, as: "ticket" }],
         },
         {
           model: Payment,
           as: "payments",
-          attributes: [
-            "id",
-            "provider",
-            "provider_txn_id",
-            "amount",
-            "status",
-            "created_at",
-          ],
         },
       ],
+      order: [
+        [{ model: OrderItem, as: "items" }, "id", "ASC"],
+        [{ model: Payment, as: "payments" }, "id", "ASC"],
+      ],
     });
-    if (!order)
-      return res.status(404).json({
-        message: "Order not found",
-      });
-    res.status(200).json({
-      message: "OK",
-      order,
-    });
-  } catch (error) {
-    res.status(500).json({
-      message: "get order detail failed",
-      detail: error.message,
-    });
+
+    if (!order) return res.status(404).json({ message: "Order not found" });
+
+    return res.json(order);
+  } catch (e) {
+    return res
+      .status(500)
+      .json({ message: "Failed to fetch order", detail: e.message });
   }
 };
-const orderController = { previewOrder, createOrder, getOrderDetail, getAllOrders };
+const orderController = {
+  previewOrder,
+  createOrder,
+  getOrderDetail,
+  getAllOrders,
+};
 
 export default orderController;

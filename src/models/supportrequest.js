@@ -21,7 +21,7 @@ export default (sequelize, DataTypes) => {
       modelName: "SupportRequest",
       tableName: "SupportRequests",
       underscored: true,
-      timestamps: false,
+      timestamps: true,
     }
   );
 

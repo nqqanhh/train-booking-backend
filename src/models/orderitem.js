@@ -36,7 +36,7 @@ export default (sequelize, DataTypes) => {
       modelName: "OrderItem",
       tableName: "OrderItems",
       underscored: true,
-      timestamps: false,
+      timestamps: true,
     }
   );
 

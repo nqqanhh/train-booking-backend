@@ -21,7 +21,7 @@ export default (sequelize, DataTypes) => {
       modelName: "Notification",
       tableName: "Notifications",
       underscored: true,
-      timestamps: false,
+      timestamps: true,
     }
   );
 

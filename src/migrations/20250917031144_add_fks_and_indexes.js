@@ -75,7 +75,7 @@ module.exports = {
       name: "fk_orders_user",
       references: { table: "Users", field: "id" },
     });
-    await q.addIndex("Orders", ["user_id", "createdAt"], {
+    await q.addIndex("Orders", ["user_id", "created_at"], {
       name: "idx_orders_user",
     }); // hoặc created_at nếu bạn đổi
 
