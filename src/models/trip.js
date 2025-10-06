@@ -35,7 +35,7 @@ export default (sequelize, DataTypes) => {
         allowNull: false,
         defaultValue: "scheduled",
       },
-      seat_template_id: { type: DataTypes.BIGINT, allowNull: false },
+      seat_template_id: { type: DataTypes.BIGINT, allowNull: true },
     },
     {
       sequelize,

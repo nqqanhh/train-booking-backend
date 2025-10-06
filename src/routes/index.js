@@ -16,6 +16,7 @@ import authorizationToken from "../middlewares/auth.middleware.js";
 import seatTemplateRouter from "./seatTemplate.route.js";
 import myRouter from "./my.route.js";
 import carriageRouter from "./carriage.route.js";
+import TripScheduleRouter from "./tripschedule.route.js";
 const router = Router();
 //
 router.get("/", (req, res) => {
@@ -41,4 +42,5 @@ router.use("/get-my", myRouter);
 //carriages
 router.use("/carriages", carriageRouter);
 //
+router.use("/trip-schedules", TripScheduleRouter)
 export default router;
