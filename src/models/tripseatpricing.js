@@ -17,7 +17,7 @@ export default (sequelize, DataTypes) => {
     {
       sequelize,
       modelName: "TripSeatPricing",
-      tableName: "TripSeatPricing",
+      tableName: "trip_seat_pricing",
       underscored: true,
       timestamps: true,
     }

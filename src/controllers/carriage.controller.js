@@ -141,59 +141,39 @@ export const deleteCarriage = async (req, res) => {
   }
 };
 
-export async function generateSeats(carriageId, t) {
-  const Carriage = db.Carriage;
-  const SeatTemplateSeat = db.SeatTemplateSeat;
-  const TripSeat = db.TripSeat;
+export async function generateSeats(carriageId, transaction = null) {
+  // kiểm tra kỹ input
+  const id = Number(
+    typeof carriageId === "object"
+      ? carriageId.id ?? carriageId.carriage_id
+      : carriageId
+  );
+  if (!id || isNaN(id)) throw new Error("Invalid carriage_id");
 
-  const core = async (id, tt) => {
-    const carriage = await Carriage.findByPk(id, { transaction: tt });
-    if (!carriage) throw new Error("Carriage not found");
+  const carriage = await Carriage.findByPk(id, { transaction });
+  if (!carriage) throw new Error(`Carriage ${id} not found`);
 
-    const tplSeats = await SeatTemplateSeat.findAll({
-      where: { template_id: carriage.seat_template_id },
-      transaction: tt,
-    });
-    if (!tplSeats.length) throw new Error("Template has no seats");
+  const tplSeats = await SeatTemplateSeat.findAll({
+    where: { template_id: carriage.seat_template_id },
+    attributes: ["seat_code"],
+    transaction,
+  });
+  if (!tplSeats.length)
+    throw new Error(`Template ${carriage.seat_template_id} has no seats`);
 
-    const payload = tplSeats.map((s) => ({
-      carriage_id: carriage.id,
-      seat_code: s.seat_code,
-      status: "available", // quan trọng: seed luôn status
-      created_at: new Date(),
-      updated_at: new Date(),
-    }));
+  const payload = tplSeats.map((s) => ({
+    carriage_id: carriage.id,
+    seat_code: s.seat_code,
+  }));
 
-    await TripSeat.bulkCreate(payload, {
-      updateOnDuplicate: ["seat_code", "status", "updated_at"],
-      transaction: tt,
-    });
+  await TripSeat.bulkCreate(payload, { transaction, ignoreDuplicates: true });
 
-    const seats = await TripSeat.findAll({
-      where: { carriage_id: id },
-      order: [["seat_code", "ASC"]],
-      transaction: tt,
-    });
-
-    return seats;
-  };
-
-  if (t) {
-    // nếu đã có transaction từ caller
-    return await core(carriageId, t);
-  }
-  // nếu không có transaction, tự tạo và tự commit/rollback
-  const tx = await db.sequelize.transaction();
-  try {
-    const result = await core(carriageId, tx);
-    await tx.commit();
-    return result;
-  } catch (e) {
-    try {
-      await tx.rollback();
-    } catch {}
-    throw e;
-  }
+  return TripSeat.findAll({
+    where: { carriage_id: id },
+    attributes: ["id", "carriage_id", "seat_code", "order_item_id", "status"],
+    order: [["seat_code", "ASC"]],
+    transaction,
+  });
 }
 
 export const listSeatsByCarriage = async (req, res) => {
@@ -307,21 +287,37 @@ export const getCarriageSeatMap = async (req, res) => {
 };
 
 export const generateSeatsEndpoint = async (req, res) => {
+  const t = await db.sequelize.transaction();
   try {
-    const id = Number(req.params.id);
-    const seats = await generateSeats(id); // không truyền t -> service tự mở/đóng TX
+    console.log("[generateSeatsEndpoint] req.params =", req.params);
+
+    // bóc id ra an toàn nhất
+    const id = Number(
+      req.params.id?.id || req.params.id?.carriage_id || req.params.id
+    );
+    if (!id || isNaN(id)) {
+      await t.rollback();
+      return res
+        .status(400)
+        .json({ message: "Invalid carriage_id", raw: req.params });
+    }
+
+    const seats = await generateSeats(id, t);
+    await t.commit();
     return res.status(201).json({
-      message: "Seats generated",
+      message: "Seats generated successfully",
       count: seats.length,
       seats,
     });
   } catch (err) {
-    return res.status(500).json({
-      message: "Internal error",
-      detail: err.message,
-    });
+    await t.rollback();
+    console.error("generateSeats error:", err);
+    return res
+      .status(500)
+      .json({ message: "generate-seats failed", detail: err.message });
   }
 };
+
 export default {
   listCarriagesByTrip,
   createCarriage,

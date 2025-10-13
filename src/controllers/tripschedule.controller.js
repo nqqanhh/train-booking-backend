@@ -7,6 +7,8 @@ dayjs.extend(tz);
 import db from "../models/index.js";
 
 const { TripSchedule, Trip, Carriage, SeatTemplateSeat, TripSeat } = db;
+const FREQS = new Set(["daily", "weekly", "custom"]);
+const STATUSES = new Set(["active", "inactive"]);
 
 function parseDOW(days_of_week) {
   if (!days_of_week) return [1, 2, 3, 4, 5, 6, 7];
@@ -41,7 +43,139 @@ function overrideExtra(dateObj, exceptions_json) {
   const dstr = dayjs(dateObj).format("YYYY-MM-DD");
   const items = exceptions_json?.extra || [];
   return items.find((x) => x.date === dstr) || null;
+}function parseJsonSafe(v) {
+  if (v === undefined || v === null || v === "") return null;
+  if (typeof v === "string") {
+    try {
+      return JSON.parse(v);
+    } catch {
+      // nếu client đã gửi sẵn chuỗi không phải JSON (VD: "1,2,3")
+      return v;
+    }
+  }
+  // đã là object/array
+  return v;
 }
+
+function toStrOrNull(x) {
+  if (x === undefined || x === null) return null;
+  if (typeof x === "string") {
+    const s = x.trim();
+    return s === "" ? null : s;
+  }
+  return String(x);
+}
+
+function normalizeScheduleBody(input = {}) {
+  const b = { ...input };
+
+  // ép số
+  if (b.route_id != null) b.route_id = Number(b.route_id);
+  if (b.eta_minutes != null) {
+    const n = Number(b.eta_minutes);
+    if (!Number.isFinite(n) || n <= 0)
+      throw new Error("eta_minutes must be a positive number");
+    b.eta_minutes = n;
+  }
+
+  // chuẩn hoá freq/status nếu có
+  if (b.freq && !FREQS.has(b.freq)) {
+    throw new Error(`freq must be one of: ${[...FREQS].join(", ")}`);
+  }
+  if (b.status && !STATUSES.has(b.status)) {
+    throw new Error(`status must be one of: ${[...STATUSES].join(", ")}`);
+  }
+
+  // days_of_week: cho phép mảng -> "1,2,3"
+  if (Array.isArray(b.days_of_week)) {
+    b.days_of_week = b.days_of_week.join(",");
+  } else if (b.days_of_week != null) {
+    b.days_of_week = String(b.days_of_week);
+  }
+
+  // time/date
+  b.depart_hm = toStrOrNull(b.depart_hm);
+  b.start_date = toStrOrNull(b.start_date);
+  b.end_date = toStrOrNull(b.end_date);
+
+  // timezone mặc định
+  if (!b.timezone) b.timezone = "Asia/Ho_Chi_Minh";
+
+  // JSON columns: để Sequelize tự validate JSON
+  b.carriages_json = parseJsonSafe(b.carriages_json);
+  b.exceptions_json = parseJsonSafe(b.exceptions_json);
+
+  return b;
+}
+
+// chỉ cho phép các field hợp lệ chui vào DB
+const ALLOWED_FIELDS = [
+  "route_id",
+  "vehicle_no",
+  "freq",
+  "days_of_week",
+  "start_date",
+  "end_date",
+  "depart_hm",
+  "eta_minutes",
+  "timezone",
+  "status",
+  "carriages_json",
+  "exceptions_json",
+];
+
+function pickAllowed(body) {
+  const out = {};
+  for (const k of ALLOWED_FIELDS) {
+    if (body[k] !== undefined) out[k] = body[k];
+  }
+  return out;
+}
+
+function formatSequelizeError(err) {
+  // Trả chi tiết gọn gàng cho Postman
+  const details =
+    err?.errors?.map((e) => ({
+      path: e.path,
+      message: e.message,
+      type: e.type,
+      value: e.value,
+    })) ||
+    err?.message ||
+    String(err);
+  return details;
+}
+
+export const createSchedule = async (req, res) => {
+  try {
+    const raw = req.body || {};
+    // bắt buộc các trường chính
+    const required = [
+      "route_id",
+      "vehicle_no",
+      "depart_hm",
+      "eta_minutes",
+      "start_date",
+    ];
+    for (const k of required) {
+      if (raw[k] === undefined || raw[k] === null || raw[k] === "")
+        return res.status(400).json({ message: `${k} required` });
+    }
+
+    const normalized = normalizeScheduleBody(raw);
+    const body = pickAllowed(normalized);
+
+    const schedule = await TripSchedule.create(body, {
+      fields: ALLOWED_FIELDS,
+    });
+    return res.status(201).json({ message: "OK", schedule });
+  } catch (error) {
+    return res.status(500).json({
+      message: "Create schedule failed",
+      detail: formatSequelizeError(error),
+    });
+  }
+};
 
 async function generateSeatsForCarriage(carriage_id, t) {
   const car = await Carriage.findByPk(carriage_id, { transaction: t });
@@ -67,33 +201,33 @@ async function generateSeatsForCarriage(carriage_id, t) {
   });
 }
 
-export const createSchedule = async (req, res) => {
-  try {
-    const body = req.body || {};
-    if (
-      !body.route_id ||
-      !body.vehicle_no ||
-      !body.depart_hm ||
-      !body.eta_minutes ||
-      !body.start_date
-    ) {
-      return res.status(400).json({
-        message:
-          "route_id, vehicle_no, depart_hm, eta_minutes, start_date required",
-      });
-    }
+// export const createSchedule = async (req, res) => {
+//   try {
+//     const raw = req.body || {};
+//     // bắt buộc các trường chính
+//     const required = [
+//       "route_id",
+//       "vehicle_no",
+//       "depart_hm",
+//       "eta_minutes",
+//       "start_date",
+//     ];
+//     for (const k of required) {
+//       if (raw[k] === undefined || raw[k] === null || raw[k] === "")
+//         return res.status(400).json({ message: `${k} required` });
+//     }
 
-    const schedule = await TripSchedule.create(body);
-    res.status(200).json({
-      message: "OK",
-      schedule,
-    });
-  } catch (error) {
-    res.status(500).json({
-      message: "Create schedule failed " + message.error,
-    });
-  }
-};
+//     const body = normalizeScheduleBody(raw);
+
+//     const schedule = await TripSchedule.create(body);
+//     return res.status(201).json({ message: "OK", schedule });
+//   } catch (error) {
+//     return res.status(500).json({
+//       message: "Create schedule failed",
+//       detail: error?.message || String(error),
+//     });
+//   }
+// };
 
 export const listSchedules = async (req, res) => {
   try {

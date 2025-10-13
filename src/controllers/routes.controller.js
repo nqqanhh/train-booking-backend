@@ -33,6 +33,47 @@ const getRoutes = async (req, res) => {
   }
 };
 
+const getOneRoute = async (req, res) => {
+  try {
+    const { destination, origin } = req.query;
+    if (!destination || !origin) {
+      return res.status(400).json({ message: "Missing destination or origin" });
+    }
+    const route = await Route.findOne({
+      where: { destination: destination, origin: origin },
+    });
+    if (!route) {
+      return res.status(404).json({ message: "Route not found" });
+    }
+    return res.status(200).json({ route: route });
+  } catch (error) {
+    res.status(500).json({
+      message: "Internal error: " + error.message,
+      sqlMessage: error.sql,
+    });
+  }
+};
+
+const getOneRouteById = async (req, res) => {
+  try {
+    const { routeId } = req.params;
+    if (!routeId) {
+      return res.status(400).json({ message: "Missing routeId" });
+    }
+    const route = await Route.findOne({
+      where: { id: routeId },
+    });
+    if (!route) {
+      return res.status(404).json({ message: "Route not found" });
+    }
+    return res.status(200).json({ route: route });
+  } catch (error) {
+    res.status(500).json({
+      message: "Internal error: " + error.message,
+      sqlMessage: error.sql,
+    });
+  }
+};
 //===admin===
 
 //create
@@ -155,5 +196,12 @@ const deleteRoute = async (req, res) => {
     });
   }
 };
-const routesController = { getRoutes, createRoute, updateRoute, deleteRoute };
+const routesController = {
+  getRoutes,
+  getOneRoute,
+  createRoute,
+  updateRoute,
+  deleteRoute,
+  getOneRouteById,
+};
 export default routesController;

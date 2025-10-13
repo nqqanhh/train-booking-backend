@@ -8,7 +8,7 @@ const carriageRouter = express.Router();
 // Carriages of a trip
 carriageRouter.get(
   "/trips/:tripId/carriages",
-  authorizationToken,
+  // authorizationToken,
   carriages.listCarriagesByTrip
 );
 carriageRouter.post(
@@ -20,7 +20,7 @@ carriageRouter.post(
 // Seats per carriage
 carriageRouter.get(
   "/:id/seats",
-  authorizationToken,
+  // authorizationToken,
   carriages.listSeatsByCarriage
 );
 //
@@ -28,8 +28,8 @@ carriageRouter.get("/:id/seatmap", carriages.generateSeatsEndpoint); // seatmap 
 // Generate seats for carriage from its seat_template
 carriageRouter.post(
   "/:id/generate-seats",
-  authorizationToken,
-  carriages.generateSeats
+  // authorizationToken,
+  carriages.generateSeatsEndpoint
 );
 
 // (Optional) Seats for whole trip (all carriages)

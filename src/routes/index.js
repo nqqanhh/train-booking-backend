@@ -17,6 +17,7 @@ import seatTemplateRouter from "./seatTemplate.route.js";
 import myRouter from "./my.route.js";
 import carriageRouter from "./carriage.route.js";
 import TripScheduleRouter from "./tripschedule.route.js";
+import clientRouter from "./client.route.js";
 const router = Router();
 //
 router.get("/", (req, res) => {
@@ -43,4 +44,7 @@ router.use("/get-my", myRouter);
 router.use("/carriages", carriageRouter);
 //
 router.use("/trip-schedules", TripScheduleRouter)
+//
+router.use("/client", clientRouter)
+//
 export default router;

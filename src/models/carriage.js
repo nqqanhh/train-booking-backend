@@ -21,6 +21,8 @@ export default (sequelize, DataTypes) => {
     {
       trip_id: { type: DataTypes.BIGINT, allowNull: false },
       seat_template_id: { type: DataTypes.BIGINT, allowNull: false },
+      name: { type: DataTypes.STRING(100), allowNull: true },
+
       carriage_no: { type: DataTypes.STRING(16), allowNull: false },
       created_at: { type: DataTypes.DATE },
       updated_at: { type: DataTypes.DATE },

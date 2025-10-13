@@ -2,7 +2,10 @@ import { hash, comparePassword } from "../utils/password.js";
 // import user from "../models/user.js";
 import db from "../models/index.js";
 import { signAccessToken, signRefreshToken } from "../utils/jwt.js";
+import { generateOtp } from "../utils/generate-otp.js";
+
 import bcrypt from "bcrypt";
+import sendOTPEmail from "../services/sendEmail.service.js";
 
 const { User } = db;
 
@@ -15,35 +18,50 @@ const toSafeUser = (u) => ({
   status: u.status,
 });
 
-const signUp = async (req, res) => {
+export const signUp = async (req, res) => {
   try {
-    const { fullName, email, phone, password, role } = req.body;
-    const isExist = await User.findOne({ where: { email } });
-    if (isExist)
-      return res.json({
-        message: "this Email is exist",
-      });
-    const password_hash = await hash(password);
-    const newUser = {
-      full_name: fullName,
-      email,
-      phone,
-      password_hash: password_hash,
+    const { full_name, email, phone, password, role } = req.body || {};
+    if (!full_name || !email || !password) {
+      return res
+        .status(400)
+        .json({ message: "full_name, email, password required" });
+    }
+
+    const normEmail = String(email).trim().toLowerCase();
+    const existed = await User.findOne({ where: { email: normEmail } });
+    if (existed)
+      return res.status(409).json({ message: "Email already exists" });
+
+    const password_hash = await bcrypt.hash(password, 10);
+
+    const created = await User.create({
+      full_name,
+      email: normEmail,
+      phone: phone ?? null,
+      password_hash,
       role: role ?? "user",
-    };
-    await User.create(newUser);
-    const getUserInfo = await User.findOne({ where: { email: email } });
-    res.status(201).json({
+      status: "active",
+    });
+
+    return res.status(201).json({
       message: "User created successfully",
-      id: getUserInfo.id,
-      user: newUser,
+      user: {
+        id: created.id,
+        email: created.email,
+        full_name: created.full_name,
+        role: created.role,
+      },
     });
   } catch (error) {
-    console.error("Signup error:", {
-      message: error.message,
-      sql: error?.sql,
-      sqlMessage: error?.original?.sqlMessage,
-    });
+    console.log(error.message);
+    if (error?.name === "SequelizeUniqueConstraintError") {
+      return res.status(409).json({ message: "Email already exists" });
+    }
+    if (error?.name === "SequelizeValidationError") {
+      return res
+        .status(400)
+        .json({ message: error.errors?.[0]?.message || "Validation error" });
+    }
     return res.status(500).json({
       message: "Lỗi server",
       detail: error?.original?.sqlMessage || error.message,
@@ -115,7 +133,30 @@ const login = async (req, res) => {
     });
   }
 };
+// const sendOtp = async (req, res) => {
+//   const { email } = req.body;
+//   if (!email) return res.status(400).json({ message: "Missing email" });
+//   const isExist = await User.findOne({ email });
+//   if (!isExist)
+//     return res.status(404).json({
+//       message: "Email not found",
+//     });
+//   try {
+//     const userEmail = email;
+//     const otp = generateOtp();
 
+//     sendOTPEmail(userEmail, otp).then((success) => {
+//       if (success) {
+//         console.log("OTP sent successfully to", userEmail);
+//       } else {
+//         console.log("Failed to send OTP to", userEmail);
+//       }
+//     });
+//     res.status(200).json({ message: "Sent email successfully" });
+//   } catch (error) {
+//     res.status(500).json({ message: "Internal error:" + error.message });
+//   }
+// };
 const changePassword = async (req, res) => {
   try {
     const { oldPass, newPass } = req.body;
