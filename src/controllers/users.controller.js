@@ -18,7 +18,7 @@ const getMyProfile = async (req, res) => {
       "updatedAt",
     ],
   });
-  return res.status(200).json({ user: me });
+  return res.status(200).json({ profile: me });
 };
 
 const updateMyProfile = async (req, res) => {

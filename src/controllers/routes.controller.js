@@ -42,9 +42,9 @@ const getOneRoute = async (req, res) => {
     const route = await Route.findOne({
       where: { destination: destination, origin: origin },
     });
-    if (!route) {
-      return res.status(404).json({ message: "Route not found" });
-    }
+    // if (!route) {
+    //   return res.status(404).json({ message: "Route not found" });
+    // }
     return res.status(200).json({ route: route });
   } catch (error) {
     res.status(500).json({
