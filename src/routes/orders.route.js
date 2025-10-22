@@ -7,8 +7,8 @@ const { Order } = db;
 
 const ordersRouter = Router();
 
-ordersRouter.get("/", orderController.getAllOrders);
+// ordersRouter.get("/", orderController.getAllOrders);
 ordersRouter.post("/preview", orderController.previewOrder);
 ordersRouter.post("/", orderController.createOrder);
-ordersRouter.get("/:id", orderController.getOrderDetail);
+// ordersRouter.get("/:id", orderController.getOrderDetail);
 export default ordersRouter;

@@ -7,8 +7,8 @@ const tripsRouter = Router();
 // user
 tripsRouter.get("/list", tripController.listTrips);
 tripsRouter.get("/:id/seatmap", tripController.getSeatMap);
+tripsRouter.get("/:id", tripController.getOneTrip);
 tripsRouter.post("/:id/generate-seats", tripController.generateSeatsForTrip);
-
 // admin (REST chuẩn)
 tripsRouter.get("/", tripController.getTrips);
 tripsRouter.post("/", tripController.createTrip);

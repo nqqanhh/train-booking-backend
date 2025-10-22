@@ -1,120 +1,124 @@
 // src/controllers/trips.controller.js
 import db from "../models/index.js";
 import { Op } from "sequelize";
-const { Trip, Route, SeatTemplateSeat, Carriage, TripSeat, TripSeatPricing } = db;
+const { Trip, Route, SeatTemplateSeat, Carriage, TripSeat, TripSeatPricing } =
+  db;
 
 // === user ===
- const listTrips = async (req, res) => {
-   try {
-     const route_id = Number(req.query.route_id);
-     const date = req.query.date; // 'YYYY-MM-DD'
-     const status = req.query.status || "scheduled";
-     const limit = Math.min(Number(req.query.limit || 20), 100);
-     const offset = Number(req.query.offset || 0);
-    
+const listTrips = async (req, res) => {
+  try {
+    const route_id = Number(req.query.route_id);
+    const date = req.query.date; // 'YYYY-MM-DD'
+    const status = req.query.status || "scheduled";
+    const limit = Math.min(Number(req.query.limit || 20), 100);
+    const offset = Number(req.query.offset || 0);
+
     //  if (!route_id || !date) {
     //    return res.status(400).json({ message: "route_id & date required" });
     //  }
 
-     // day range [00:00, 23:59:59] theo Asia/Ho_Chi_Minh (DB đang lưu DATETIME local)
-     const start = `${date} 00:00:00`;
-     const end = `${date} 23:59:59`;
+    // day range [00:00, 23:59:59] theo Asia/Ho_Chi_Minh (DB đang lưu DATETIME local)
+    const start = `${date} 00:00:00`;
+    const end = `${date} 23:59:59`;
 
-     const where = {
-       route_id,
-       departure_time: { [Op.between]: [start, end] },
-     };
-     if (status) where.status = status;
+    const where = {
+      route_id,
+      departure_time: { [Op.between]: [start, end] },
+    };
+    if (status) where.status = status;
 
-     const trips = await Trip.findAndCountAll({
-       where,
-       order: [["departure_time", "ASC"]],
-       limit,
-       offset,
-       attributes: [
-         "id",
-         "route_id",
-         "departure_time",
-         "arrival_time",
-         "vehicle_no",
-         "status",
-       ],
-       include: [
-         {
-           model: Route,
-           as: "route",
-           attributes: [
-             "id",
-             "origin",
-             "destination",
-             "distance_km",
-             "eta_minutes",
-           ],
-         },
-         // nếu cần số toa:
-         { model: Carriage,as:"carriages", attributes: ["id"], required: false },
-       ],
-     });
+    const trips = await Trip.findAndCountAll({
+      where,
+      order: [["departure_time", "ASC"]],
+      limit,
+      offset,
+      attributes: [
+        "id",
+        "route_id",
+        "departure_time",
+        "arrival_time",
+        "vehicle_no",
+        "status",
+      ],
+      include: [
+        {
+          model: Route,
+          as: "route",
+          attributes: [
+            "id",
+            "origin",
+            "destination",
+            "distance_km",
+            "eta_minutes",
+          ],
+        },
+        // nếu cần số toa:
+        {
+          model: Carriage,
+          as: "carriages",
+          attributes: ["id"],
+          required: false,
+        },
+      ],
+    });
 
-     // (tuỳ chọn) gắn thêm min_price & availability
-     const includeAvailability = req.query.include_availability === "true";
-     const includeMinPrice = req.query.include_min_price === "true";
+    // (tuỳ chọn) gắn thêm min_price & availability
+    const includeAvailability = req.query.include_availability === "true";
+    const includeMinPrice = req.query.include_min_price === "true";
 
-     let data = trips.rows.map((t) => ({
-       id: t.id,
-       route_id: t.route_id,
-       departure_time: t.departure_time,
-       arrival_time: t.arrival_time,
-       vehicle_no: t.vehicle_no,
-       status: t.status,
-       route: t.Route,
-       carriages_count: t.Carriages?.length || 0,
-     }));
+    let data = trips.rows.map((t) => ({
+      id: t.id,
+      route_id: t.route_id,
+      departure_time: t.departure_time,
+      arrival_time: t.arrival_time,
+      vehicle_no: t.vehicle_no,
+      status: t.status,
+      route: t.Route,
+      carriages_count: t.Carriages?.length || 0,
+    }));
 
-    
+    if (includeAvailability) {
+      const ids = data.map((d) => d.id);
+      // đếm available/sold theo trip: join qua Carriage
+      const seats = await TripSeat.findAll({
+        include: [
+          {
+            model: Carriage,
+            as: "carriage",
+            attributes: ["trip_id"],
+            where: { trip_id: ids },
+          },
+        ],
+        attributes: ["status", "carriage_id"],
+        raw: true,
+      });
+      const stat = new Map(); // trip_id -> {available, sold}
+      for (const s of seats) {
+        // sequelize raw include alias: 'Carriage.trip_id'
+        const tripId = s["Carriage.trip_id"];
+        const o = stat.get(tripId) || { available: 0, sold: 0 };
+        if (s.status === "sold") o.sold++;
+        else o.available++;
+        stat.set(tripId, o);
+      }
+      data = data.map((d) => ({
+        ...d,
+        availability: stat.get(d.id) || { available: 0, sold: 0 },
+      }));
+    }
 
-     if (includeAvailability) {
-       const ids = data.map((d) => d.id);
-       // đếm available/sold theo trip: join qua Carriage
-       const seats = await TripSeat.findAll({
-         include: [
-           {
-             model: Carriage,
-             as:"carriage",
-             attributes: ["trip_id"],
-             where: { trip_id: ids },
-           },
-         ],
-         attributes: ["status", "carriage_id"],
-         raw: true,
-       });
-       const stat = new Map(); // trip_id -> {available, sold}
-       for (const s of seats) {
-         // sequelize raw include alias: 'Carriage.trip_id'
-         const tripId = s["Carriage.trip_id"];
-         const o = stat.get(tripId) || { available: 0, sold: 0 };
-         if (s.status === "sold") o.sold++;
-         else o.available++;
-         stat.set(tripId, o);
-       }
-       data = data.map((d) => ({
-         ...d,
-         availability: stat.get(d.id) || { available: 0, sold: 0 },
-       }));
-     }
-
-     return res.json({
-       count: trips.count,
-       rows: data,
-       limit,
-       offset,
-     });
-   } catch (e) {
-     return res
-       .status(500)
-       .json({ message: "list-trips failed", detail: e.message });
-   }
- };
+    return res.json({
+      count: trips.count,
+      rows: data,
+      limit,
+      offset,
+    });
+  } catch (e) {
+    return res
+      .status(500)
+      .json({ message: "list-trips failed", detail: e.message });
+  }
+};
 // === admin ===
 const getTrips = async (req, res) => {
   try {
@@ -337,6 +341,21 @@ export const generateSeatsForTrip = async (req, res) => {
   }
 };
 
+export const getOneTrip = async (req, res) => {
+  try {
+    const id = req.params;
+    const trip = await Trip.findOne(id );
+    console.log("trip", trip);
+    res.status(200).json({
+      message: "OK",
+      trip,
+    });
+  } catch (error) {
+    return res.status(500).json({
+      message: "Get trip header failed" + error.message,
+    });
+  }
+};
 const tripController = {
   listTrips,
   getTrips,
@@ -345,5 +364,6 @@ const tripController = {
   deleteTrip,
   getSeatMap,
   generateSeatsForTrip,
+  getOneTrip,
 };
 export default tripController;

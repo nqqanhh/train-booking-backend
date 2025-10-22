@@ -1,6 +1,21 @@
+import { matchesGlob } from "path";
 import db from "../models/index.js";
 const { PassengerProfile } = db;
 
+//get all (admin)
+const getAllPassengers = async (req, res) => {
+  try {
+    const passengers = await PassengerProfile.findAll();
+    res.status(200).json({
+      message: "OK",
+      passengers,
+    });
+  } catch (e) {
+    return res.status(500).json({
+      message: "Get passengers failed: " + e.message,
+    });
+  }
+};
 //get passenger profiles
 const getPassenger = async (req, res) => {
   const user = req.user;
@@ -28,6 +43,20 @@ const getPassenger = async (req, res) => {
   }
 };
 
+const getOnePassenger = async (req, res) => {
+  try {
+    const passengerId = req.params;
+    const passenger = await PassengerProfile.findOne(passengerId);
+    res.status(200).json({
+      message: "OK",
+      passenger,
+    });
+  } catch (e) {
+    return res.status(500).json({
+      message: "Error getting passenger: " + e.message,
+    });
+  }
+};
 //create passenger profiles
 const createPassengerProfile = async (req, res) => {
   try {
@@ -148,7 +177,9 @@ const deletePassengerProfile = async (req, res) => {
   }
 };
 const passengerProfileController = {
+  getAllPassengers,
   getPassenger,
+  getOnePassenger,
   createPassengerProfile,
   updatePassengerProfile,
   deletePassengerProfile,
