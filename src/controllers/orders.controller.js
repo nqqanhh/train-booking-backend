@@ -148,24 +148,12 @@ const createOrder = async (req, res) => {
       // Tính giá
       const templateId = carList[0].seat_template_id;
       let price = 0;
-
-      // Ưu tiên giá override
-      const override = await TripSeatPricing.findOne({
-        where: { trip_id: it.trip_id, seat_code: it.seat_code },
+      const tplSeat = await SeatTemplateSeat.findOne({
+        where: { template_id: templateId, seat_code: it.seat_code },
         raw: true,
         transaction: t,
       });
-      if (override?.price != null) {
-        price = Number(override.price);
-      } else {
-        const tplSeat = await SeatTemplateSeat.findOne({
-          where: { template_id: templateId, seat_code: it.seat_code },
-          raw: true,
-          transaction: t,
-        });
-        price = Number(tplSeat?.base_price || 0);
-      }
-
+      price = Number(tplSeat?.base_price || 0) / 10000;
       total += price;
       orderItemsPayload.push({
         trip_id: it.trip_id,
@@ -178,6 +166,10 @@ const createOrder = async (req, res) => {
     // Tạo order
     const order = await Order.create(
       { user_id, status: "pending", total_amount: total.toFixed(2) },
+      {
+        fields: ["user_id", "status", "total_amount"], // ép chỉ 3 cột này
+        // silent: true, // (không cần, nhưng nếu bạn có hook timestamps thì có thể bật)
+      },
       { transaction: t }
     );
 
@@ -211,9 +203,15 @@ const createOrder = async (req, res) => {
     });
   } catch (error) {
     await t.rollback();
-    res.status(500).json({
+    console.error("[createOrder SQL err]", {
+      sqlMessage: error?.original?.sqlMessage,
+      sql: error?.original?.sql,
+    });
+    return res.status(500).json({
       message: "create-order failed",
       detail: error?.message || String(error),
+      sqlMsg: error?.original?.sqlMessage,
+      sql: error?.original?.sql,
     });
   }
 };

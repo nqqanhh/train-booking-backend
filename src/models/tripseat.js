@@ -38,8 +38,10 @@ export default (sequelize, DataTypes) => {
       sequelize,
       modelName: "TripSeat",
       tableName: "TripSeats",
-      underscored: true,
-      timestamps: true, // tùy bảng bạn
+      timestamps: true,
+      underscored: true, // <-- quan trọng
+      createdAt: "created_at", // (tùy chọn) tường minh
+      updatedAt: "updated_at", // (tùy chọn)
       indexes: [
         { unique: true, fields: ["carriage_id", "seat_code"] },
         { fields: ["order_item_id"] },

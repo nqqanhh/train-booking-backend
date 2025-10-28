@@ -1,6 +1,6 @@
 // src/controllers/tickets.controller.js
 import db from "../models/index.js";
-const { Ticket, OrderItem } = db;
+const { Ticket, OrderItem, Trip, Route, PassengerProfile } = db;
 
 /**
  * Tạo ticket cho toàn bộ OrderItems thuộc 1 order.
@@ -191,6 +191,132 @@ export const getAllTickets = async (req, res) => {
   } catch (error) {
     res.status(500).json({
       message: "Internal error " + error.message,
+    });
+  }
+};
+
+export const getTicketById = async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    if (!id) return res.status(400).json({ message: "Invalid ticket id" });
+
+    // Include theo alias đã dùng trong project:
+    // - Ticket belongsTo OrderItem as 'order_item'
+    // - OrderItem belongsTo Trip as 'trip'
+    // - Trip belongsTo Route as 'route'
+    // - OrderItem belongsTo PassengerProfile as 'passenger'
+    const ticket = await Ticket.findByPk(id, {
+      attributes: [
+        "id",
+        "order_item_id",
+        "qr_payload",
+        "status",
+        "issued_at",
+        "used_at",
+        "created_at",
+        "updated_at",
+      ],
+      include: [
+        {
+          model: OrderItem,
+          as: "order_item",
+          attributes: ["id", "trip_id", "seat_code", "price", "created_at"],
+          include: [
+            {
+              model: Trip,
+              as: "trip",
+              attributes: [
+                "id",
+                "route_id",
+                "vehicle_no",
+                "departure_time",
+                "arrival_time",
+                "status",
+              ],
+              include: [
+                {
+                  model: Route,
+                  as: "route",
+                  attributes: [
+                    "id",
+                    "origin",
+                    "destination",
+                    "distance_km",
+                    "eta_minutes",
+                  ],
+                },
+              ],
+            },
+            {
+              model: PassengerProfile,
+              as: "passenger",
+              attributes: ["id", "full_name", "phone"],
+            },
+          ],
+        },
+      ],
+    });
+
+    if (!ticket) return res.status(404).json({ message: "ticket not found" });
+
+    // Chuẩn hoá payload trả ra gọn gàng
+    const oi = ticket.order_item || {};
+    const trip = oi.trip || {};
+    const route = trip.route || {};
+    const depart = trip.departure_time ? new Date(trip.departure_time) : null;
+
+    const detail = {
+      ticket: {
+        id: ticket.id,
+        status: ticket.status,
+        issued_at: ticket.issued_at,
+        used_at: ticket.used_at,
+        qr_payload: ticket.qr_payload,
+      },
+      seat: {
+        seat_code: oi.seat_code,
+        price: oi.price != null ? Number(oi.price) : null,
+      },
+      passenger: oi.passenger
+        ? {
+            id: oi.passenger.id,
+            full_name: oi.passenger.full_name,
+            phone: oi.passenger.phone,
+          }
+        : null,
+      trip: {
+        id: trip.id,
+        vehicle_no: trip.vehicle_no,
+        route_id: trip.route_id,
+        status: trip.status,
+        departure_time: trip.departure_time,
+        arrival_time: trip.arrival_time,
+        travel_date: depart
+          ? `${depart.getFullYear()}-${String(depart.getMonth() + 1).padStart(
+              2,
+              "0"
+            )}-${String(depart.getDate()).padStart(2, "0")}`
+          : null,
+        route: route.id
+          ? {
+              id: route.id,
+              origin: route.origin,
+              destination: route.destination,
+              distance_km:
+                route.distance_km != null ? Number(route.distance_km) : null,
+              eta_minutes:
+                route.eta_minutes != null ? Number(route.eta_minutes) : null,
+            }
+          : null,
+      },
+    };
+
+    return res.status(200).json({ message: "OK", detail });
+  } catch (error) {
+    return res.status(500).json({
+      message: "Internal error",
+      detail: error.message,
+      sqlMsg: error.sql,
     });
   }
 };

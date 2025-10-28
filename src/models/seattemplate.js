@@ -30,8 +30,10 @@ export default (sequelize, DataTypes) => {
       sequelize,
       modelName: "SeatTemplate",
       tableName: "SeatTemplates",
-      underscored: true,
-      timestamps: true, // chỉ có created_at
+      timestamps: true,
+      underscored: true, // <-- quan trọng
+      createdAt: "created_at", // (tùy chọn) tường minh
+      updatedAt: "updated_at", // (tùy chọn)
     }
   );
 

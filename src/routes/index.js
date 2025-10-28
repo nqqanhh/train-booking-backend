@@ -39,12 +39,12 @@ router.use("/passenger-profile", authorizationToken, passengerProfileRouter);
 //
 router.use("/seat-templates", seatTemplateRouter);
 //get my <something>
-router.use("/get-my", myRouter);
+router.use("/get-my", authorizationToken, myRouter);
 //carriages
 router.use("/carriages", carriageRouter);
 //
-router.use("/trip-schedules", TripScheduleRouter)
+router.use("/trip-schedules", TripScheduleRouter);
 //
-router.use("/client", clientRouter)
+router.use("/client", clientRouter);
 //
 export default router;

@@ -22,8 +22,10 @@ export default (sequelize, DataTypes) => {
       sequelize,
       modelName: "Route",
       tableName: "Routes",
-      underscored: true,
-      timestamps: true, // vì bạn đã có created_at/updated_at custom
+      timestamps: true,
+      underscored: true, // <-- quan trọng
+      createdAt: "created_at", // (tùy chọn) tường minh
+      updatedAt: "updated_at", // (tùy chọn)
     }
   );
 

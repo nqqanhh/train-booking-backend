@@ -24,10 +24,10 @@ export default (sequelize, DataTypes) => {
       sequelize,
       modelName: "Payment",
       tableName: "Payments",
-      timestamps: true, // bật timestamps
-      createdAt: "createdAt", // map đúng tên cột trong DB
-      updatedAt: "updatedAt", // map đúng tên cột trong DB
-      underscored: true, // vì đang dùng camelCase
+      timestamps: true,
+      underscored: true, // <-- quan trọng
+      createdAt: "created_at", // (tùy chọn) tường minh
+      updatedAt: "updated_at", // (tùy chọn)
     }
   );
 

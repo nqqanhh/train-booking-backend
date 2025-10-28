@@ -18,36 +18,31 @@ export default (sequelize, DataTypes) => {
     }
   }
 
-  Order.init(
-    {
-      user_id: { type: DataTypes.BIGINT, allowNull: false },
-      status: {
-        type: DataTypes.ENUM(
-          "pending",
-          "paid",
-          "cancelled",
-          "refunded",
-          "failed"
-        ),
-        allowNull: false,
-        defaultValue: "pending",
-      },
-      total_amount: {
-        type: DataTypes.DECIMAL(12, 2),
-        allowNull: false,
-        defaultValue: 0,
-      },
+Order.init(
+  {
+    user_id: { type: DataTypes.BIGINT, allowNull: false },
+    status: {
+      type: DataTypes.ENUM("pending","paid","cancelled","refunded","failed"),
+      allowNull: false,
+      defaultValue: "pending",
     },
-    {
-      sequelize,
-      modelName: "Order",
-      tableName: "Orders",
-      timestamps: true, // sẽ dùng createdAt/updatedAt
-      underscored: true, // 👈 BẮT BUỘC camelCase
-      createdAt: "createdAt", // (tường minh, để khỏi lệch)
-      updatedAt: "updatedAt",
-    }
-  );
+    total_amount: {
+      type: DataTypes.DECIMAL(12, 2),
+      allowNull: false,
+      defaultValue: 0,
+    },
+  },
+  {
+    sequelize,
+    modelName: "Order",
+    tableName: "Orders",
+    timestamps: true,
+    underscored: true,
+    createdAt: "created_at",   // <— quan trọng
+    updatedAt: "updated_at",   // <— quan trọng
+  }
+);
+
 
   return Order;
 };

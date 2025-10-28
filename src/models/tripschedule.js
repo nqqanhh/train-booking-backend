@@ -37,7 +37,10 @@ export default (sequelize, DataTypes) => {
     },
     {
       tableName: "TripSchedules",
-      underscored: true,
+      timestamps: true,
+      underscored: true, // <-- quan trọng
+      createdAt: "created_at", // (tùy chọn) tường minh
+      updatedAt: "updated_at", // (tùy chọn)
     }
   );
 
