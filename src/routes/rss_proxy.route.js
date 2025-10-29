@@ -89,9 +89,9 @@ rssRouter.get("/train-articles", async (req, res) => {
   try {
     const q = (req.query.q || "").toString().trim();
     const page = Math.max(1, parseInt((req.query.page) || "1", 10));
-    const pageSize = Math.min(50, Math.max(1, parseInt((req.query.pageSize) || "20", 10)));
+    const pageSize = Math.min(50, Math.max(1, parseInt((req.query.pageSize) || "6", 10)));
     const fresh = req.query.fresh === "1";
-    const all = req.query.all === "1";                // ⬅️ NEW
+    const all = req.query.all === "1";               
 
     if (!isCacheFresh() || fresh || CACHE.data.length === 0) {
       const data = await fetchAllFeeds();
