@@ -3,6 +3,7 @@ import bodyParser from "body-parser";
 import router from "./src/routes/index.js";
 import cors from "cors";
 import dotenv from "dotenv";
+import { sequelize } from "./src/db/index.js";
 
 dotenv.config();
 const app = express();
@@ -20,4 +21,13 @@ app.get("/", (req, res) => {
 });
 app.listen(PORT, () => {
   console.log(`Server is running on http://localhost:${PORT}`);
+});
+//
+app.get("/api/db-ping", async (req, res) => {
+  try {
+    await sequelize.authenticate();
+    res.json({ db: "ok" });
+  } catch (e) {
+    res.status(500).json({ db: "fail", error: String(e) });
+  }
 });
