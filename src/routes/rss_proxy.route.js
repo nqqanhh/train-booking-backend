@@ -88,12 +88,10 @@ const fetchAllFeeds = async () => {
 rssRouter.get("/train-articles", async (req, res) => {
   try {
     const q = (req.query.q || "").toString().trim();
-    const page = Math.max(1, parseInt(req.query.page || "1", 10));
-    const pageSize = Math.min(
-      50,
-      Math.max(1, parseInt(req.query.pageSize || "20", 10))
-    );
+    const page = Math.max(1, parseInt((req.query.page) || "1", 10));
+    const pageSize = Math.min(50, Math.max(1, parseInt((req.query.pageSize) || "20", 10)));
     const fresh = req.query.fresh === "1";
+    const all = req.query.all === "1";                // ⬅️ NEW
 
     if (!isCacheFresh() || fresh || CACHE.data.length === 0) {
       const data = await fetchAllFeeds();
@@ -101,29 +99,34 @@ rssRouter.get("/train-articles", async (req, res) => {
     }
 
     const keywords = q
-      ? q
-          .split(",")
-          .map((s) => s.trim())
-          .filter(Boolean)
+      ? q.split(",").map((s) => s.trim()).filter(Boolean)
       : DEFAULT_KEYWORDS;
+
     const includes = (text) =>
-      text &&
-      keywords.some((k) => text.toLowerCase().includes(k.toLowerCase()));
+      !!text && keywords.some((k) => text.toLowerCase().includes(k.toLowerCase()));
+
     const filtered = CACHE.data.filter(
-      (it) => includes(it.title) || includes(it.summary)
+      it => includes(it.title) || includes(it.summary)
     );
 
+    if (all) {
+      // Trả nguyên bộ cho client tự phân trang
+      return res.json({
+        ok: true,
+        total: filtered.length,
+        items: filtered,
+        cached: isCacheFresh() && !fresh,
+      });
+    }
+
+    // Giữ nguyên cơ chế page khi không dùng all=1
     const total = filtered.length;
     const start = (page - 1) * pageSize;
     const items = filtered.slice(start, start + pageSize);
 
     res.json({
       ok: true,
-      page,
-      pageSize,
-      total,
-      keywords,
-      items,
+      page, pageSize, total, items,
       cached: isCacheFresh() && !fresh,
     });
   } catch (e) {
@@ -131,6 +134,7 @@ rssRouter.get("/train-articles", async (req, res) => {
     res.status(500).json({ ok: false, message: "Failed to fetch feeds." });
   }
 });
+
 
 // Detail
 const DETAIL_CACHE = new Map();
