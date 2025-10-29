@@ -5,6 +5,7 @@ import cors from "cors";
 import dotenv from "dotenv";
 import db from "./src/models/index.js";
 import rssRouter from "./src/routes/rss_proxy.route.js";
+import diag from "./src/routes/_diag.js";
 dotenv.config();
 const app = express();
 const PORT = process.env.PORT;
@@ -36,3 +37,5 @@ app.get("/api/db-ping", async (req, res) => {
     res.status(500).json({ db: "fail", error: String(e) });
   }
 });
+//
+app.use("/_diag", diag);

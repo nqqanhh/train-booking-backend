@@ -17,21 +17,20 @@ function issueResetToken(email) {
   );
 }
 
-// POST /auth/otp/request  { email }
+// POST /auth/otp/request
 const requestOtp = async (req, res) => {
   try {
     const { email } = req.body || {};
     if (!email) return res.status(400).json({ message: "email required" });
 
-    // user phải tồn tại (tránh lộ thông tin: trả response chung)
     const user = await User.findOne({ where: { email } });
     if (!user) {
+      // tránh lộ thông tin tài khoản
       return res
         .status(200)
         .json({ message: "If this email exists, an OTP has been sent." });
     }
 
-    // rate limit: 1 request / 60s
     const last = await Otp.findOne({
       where: { email, purpose: "reset_password" },
       order: [["created_at", "DESC"]],
@@ -48,7 +47,6 @@ const requestOtp = async (req, res) => {
     }
 
     const { otp, expiresAt } = generateOtp();
-    console.log(otp);
     const rec = await Otp.create({
       email,
       purpose: "reset_password",
@@ -57,22 +55,18 @@ const requestOtp = async (req, res) => {
       attempts: 0,
     });
 
+    const sent = await sendOTPEmail(email, otp);
+    if (!sent) {
+      // có thể xóa record vừa tạo nếu muốn
+      return res.status(500).json({ message: "Failed to send OTP email." });
+    }
+
     const devEcho =
-      process.env.NODE_ENV !== "production" ? { dev_otp: otp } : undefined;
-    const userEmail = email;
-    sendOTPEmail(userEmail, otp).then((success) => {
-      if (success) {
-        console.log("OTP sent successfully to", userEmail);
-      } else {
-        console.log("Failed to send OTP to", userEmail);
-      }
-    });
-    console.log("otp sent");
+      process.env.NODE_ENV !== "production" ? { dev_otp: otp } : {};
     return res.status(200).json({
       message: "OTP created",
       expires_at: rec.expires_at,
       ...devEcho,
-      otp: otp,
     });
   } catch (e) {
     return res
@@ -81,24 +75,18 @@ const requestOtp = async (req, res) => {
   }
 };
 
-// POST /auth/otp/verify  { email, otp }
+// POST /auth/otp/verify
 const verifyOtpCode = async (req, res) => {
   try {
     const { email, otp } = req.body || {};
     if (!email || !otp)
       return res.status(400).json({ message: "email & otp required" });
 
-    // lấy mã mới nhất chưa dùng & chưa hết hạn
     const rec = await Otp.findOne({
-      where: {
-        email,
-        purpose: "reset_password",
-        consumed_at: null,
-      },
+      where: { email, purpose: "reset_password", consumed_at: null },
       order: [["created_at", "DESC"]],
     });
     if (!rec) return res.status(400).json({ message: "OTP invalid" });
-
     if (new Date(rec.expires_at).getTime() < Date.now()) {
       return res.status(400).json({ message: "OTP expired" });
     }
@@ -107,14 +95,12 @@ const verifyOtpCode = async (req, res) => {
     }
 
     const ok = verifyOtp(otp, rec.otp_hash);
-    await rec.update({ attempts: rec.attempts + 1 });
+    if (!ok) {
+      await rec.update({ attempts: rec.attempts + 1 });
+      return res.status(400).json({ message: "OTP incorrect" });
+    }
 
-    if (!ok) return res.status(400).json({ message: "OTP incorrect" });
-
-    // mark consumed
-    await rec.update({ consumed_at: new Date() });
-
-    // cấp reset token ngắn hạn
+    await rec.update({ consumed_at: new Date() }); // đúng thì không cần tăng attempts
     const reset_token = issueResetToken(email);
     return res.status(200).json({ message: "OTP verified", reset_token });
   } catch (e) {
@@ -135,7 +121,7 @@ const resetPassword = async (req, res) => {
         .status(400)
         .json({ message: "email, reset_token, new_password required" });
     }
-    // verify reset token
+
     let payload;
     try {
       payload = jwt.verify(
@@ -160,7 +146,6 @@ const resetPassword = async (req, res) => {
     const password_hash = await bcrypt.hash(new_password, 10);
     await user.update({ password_hash }, { transaction: t });
 
-    // (tuỳ chọn) thu hồi toàn bộ OTP chưa dùng
     await Otp.update(
       { consumed_at: new Date() },
       { where: { email, consumed_at: null }, transaction: t }
