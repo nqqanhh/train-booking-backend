@@ -3,8 +3,7 @@ import bodyParser from "body-parser";
 import router from "./src/routes/index.js";
 import cors from "cors";
 import dotenv from "dotenv";
-import { sequelize } from "./src/db/index.js";
-
+import db from "./src/models/index.js";
 dotenv.config();
 const app = express();
 const PORT = process.env.PORT;
@@ -25,7 +24,7 @@ app.listen(PORT, () => {
 //
 app.get("/api/db-ping", async (req, res) => {
   try {
-    await sequelize.authenticate();
+    await db.sequelize.authenticate();
     res.json({ db: "ok" });
   } catch (e) {
     res.status(500).json({ db: "fail", error: String(e) });
