@@ -42,22 +42,20 @@ if (config.use_env_variable) {
   });
 } else if (process.env.DB_HOST) {
   // Không dùng chuỗi kết nối, mà dùng DB_* rời
-  const {
-    DB_HOST, DB_PORT = 3306, DB_NAME, DB_USER, DB_PASS,
-  } = process.env;
+  const { DB_HOST, DB_PORT = 3306, DB_NAME, DB_USER, DB_PASS } = process.env;
 
-  sequelize = new Sequelize(DB_NAME, DB_USER, DB_PASS, {
-    host: DB_HOST,
-    port: Number(DB_PORT),
-    dialect: "mysql",
+  sequelize = new Sequelize(process.env.DATABASE_URL, {
+    // host: DB_HOST,
+    // port: Number(DB_PORT),
+    // dialect: "mysql",
     logging: process.env.NODE_ENV === "development" ? console.log : false,
     timezone: "+07:00",
     define: { underscored: true, freezeTableName: true },
-    dialectOptions: {
-      dateStrings: true,
-      typeCast: true,
-      // ssl: { require: true, rejectUnauthorized: false },
-    },
+    // dialectOptions: {
+    //   dateStrings: true,
+    //   typeCast: true,
+    //   // ssl: { require: true, rejectUnauthorized: false },
+    // },
   });
 } else {
   // ───────────────────────────────────────────────────────────
@@ -67,9 +65,9 @@ if (config.use_env_variable) {
   // Kiểm tra file config.json của bạn khớp tên key này chưa!
   // ───────────────────────────────────────────────────────────
   sequelize = new Sequelize(
-    config.database,      // <- database name
-    config.username,      // <- username
-    config.password,      // <- password
+    config.database, // <- database name
+    config.username, // <- username
+    config.password, // <- password
     {
       host: config.host,
       port: config.port || 3306,
