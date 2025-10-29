@@ -22,6 +22,8 @@ app.listen(PORT, () => {
   console.log(`Server is running on http://localhost:${PORT}`);
 });
 //
+app.get("/api/health", (req, res) => res.json({ ok: true, time: Date.now() }));
+
 app.get("/api/db-ping", async (req, res) => {
   try {
     await db.sequelize.authenticate();
