@@ -19,38 +19,40 @@ const configFile = require("../config/config.json");
 const config = configFile[env];
 
 const db = {};
-
+const { DB_HOST, DB_PORT, DB_NAME, DB_USER, DB_PASS, NODE_ENV } = process.env;
 // Khởi tạo Sequelize
 let sequelize;
-if (config.use_env_variable) {
-  sequelize = new Sequelize(process.env[config.use_env_variable], {
-    ...config,
-    logging: console.log,
-    timezone: "+07:00",
-    define: {
-      underscored: true,
-      freezeTableName: true,
-    },
-    dialectOptions: {
-      dateStrings: true,
-      typeCast: true,
-    },
-  });
-} else {
-  sequelize = new Sequelize(config.database, config.username, config.password, {
-    ...config,
-    logging: false,
-    timezone: "+07:00",
-    define: {
-      underscored: true,
-      freezeTableName: true,
-    },
-    dialectOptions: {
-      dateStrings: true,
-      typeCast: true,
-    },
-  });
-}
+// if (config.use_env_variable) {
+//   sequelize = new Sequelize(process.env[config.use_env_variable], {
+//     ...config,
+//     logging: console.log,
+//     timezone: "+07:00",
+//     define: {
+//       underscored: true,
+//       freezeTableName: true,
+//     },
+//     dialectOptions: {
+//       dateStrings: true,
+//       typeCast: true,
+//     },
+//   });
+// } else {
+sequelize = new Sequelize(DB_NAME, DB_USER, DB_PASS, {
+  host: DB_HOST,
+  port: Number(DB_PORT || 3306),
+  dialect: "mysql",
+  logging: NODE_ENV === "development" ? console.log : false,
+  timezone: "+07:00",
+  define: {
+    underscored: true,
+    freezeTableName: true,
+  },
+  dialectOptions: {
+    dateStrings: true,
+    typeCast: true,
+  },
+});
+// }
 
 // Load tất cả model trong thư mục
 const files = fs.readdirSync(__dirname).filter((file) => {
