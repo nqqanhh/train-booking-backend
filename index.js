@@ -4,6 +4,7 @@ import router from "./src/routes/index.js";
 import cors from "cors";
 import dotenv from "dotenv";
 import db from "./src/models/index.js";
+import rssRouter from "./src/routes/rss_proxy.route.js";
 dotenv.config();
 const app = express();
 const PORT = process.env.PORT;
@@ -18,6 +19,9 @@ app.use("/api", router);
 app.get("/", (req, res) => {
   res.send(`App is running on PORT ${PORT}`);
 });
+// mount RSS proxy dưới /rss
+app.use("/rss", rssRouter);
+//
 app.listen(PORT, () => {
   console.log(`Server is running on http://localhost:${PORT}`);
 });
