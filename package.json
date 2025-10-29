@@ -28,6 +28,7 @@
     "nodemailer": "^7.0.9",
     "nodemon": "^3.1.10",
     "path": "^0.12.7",
+    "resend": "^6.3.0",
     "rss-parser": "^3.13.0",
     "sequelize": "^6.37.7",
     "sequelize-cli": "^6.6.3"

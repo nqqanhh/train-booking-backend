@@ -48,6 +48,7 @@ const requestOtp = async (req, res) => {
     }
 
     const { otp, expiresAt } = generateOtp();
+    console.log(otp);
     const rec = await Otp.create({
       email,
       purpose: "reset_password",
@@ -66,10 +67,12 @@ const requestOtp = async (req, res) => {
         console.log("Failed to send OTP to", userEmail);
       }
     });
+    console.log("otp sent");
     return res.status(200).json({
       message: "OTP created",
       expires_at: rec.expires_at,
       ...devEcho,
+      otp: otp,
     });
   } catch (e) {
     return res

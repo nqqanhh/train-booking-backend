@@ -13,23 +13,15 @@ const parser = new Parser({
 const FEEDS = [
   "https://vnexpress.net/rss/du-lich.rss",
   "https://tuoitre.vn/rss/du-lich.rss",
+  "https://tuoitre.vn/rss.htm",
+  "https://www.baogiaothong.vn/index.rss",
+  "https://giaothong.tapchixaydung.vn/index.rss",
+  "https://www.vietnamplus.vn/rss.vnp",
+  "https://vov.gov.vn/Rss/RssPage",
+  "https://mt.gov.vn/vn/pages/rss.aspx",
 ];
 
-const DEFAULT_KEYWORDS = [
-  "tàu hỏa",
-  "tàu hoả",
-  "đường sắt",
-  "tàu thống nhất",
-  "SE1",
-  "SE2",
-  "SE3",
-  "SE4",
-  "ga",
-  "toa",
-  "giường nằm",
-  "train",
-  "railway",
-];
+const DEFAULT_KEYWORDS = ["tàu hỏa","tàu hoả","đường sắt","ga","toa","giường nằm","SE1","SE2","SE3","SE4","train","railway"]
 
 let CACHE = { at: 0, minutes: 10, data: [] };
 const isCacheFresh = () => Date.now() - CACHE.at < CACHE.minutes * 60 * 1000;
@@ -88,10 +80,13 @@ const fetchAllFeeds = async () => {
 rssRouter.get("/train-articles", async (req, res) => {
   try {
     const q = (req.query.q || "").toString().trim();
-    const page = Math.max(1, parseInt((req.query.page) || "1", 10));
-    const pageSize = Math.min(50, Math.max(1, parseInt((req.query.pageSize) || "6", 10)));
+    const page = Math.max(1, parseInt(req.query.page || "1", 10));
+    const pageSize = Math.min(
+      50,
+      Math.max(1, parseInt(req.query.pageSize || "6", 10))
+    );
     const fresh = req.query.fresh === "1";
-    const all = req.query.all === "1";               
+    const all = req.query.all === "1";
 
     if (!isCacheFresh() || fresh || CACHE.data.length === 0) {
       const data = await fetchAllFeeds();
@@ -99,14 +94,18 @@ rssRouter.get("/train-articles", async (req, res) => {
     }
 
     const keywords = q
-      ? q.split(",").map((s) => s.trim()).filter(Boolean)
+      ? q
+          .split(",")
+          .map((s) => s.trim())
+          .filter(Boolean)
       : DEFAULT_KEYWORDS;
 
     const includes = (text) =>
-      !!text && keywords.some((k) => text.toLowerCase().includes(k.toLowerCase()));
+      !!text &&
+      keywords.some((k) => text.toLowerCase().includes(k.toLowerCase()));
 
     const filtered = CACHE.data.filter(
-      it => includes(it.title) || includes(it.summary)
+      (it) => includes(it.title) || includes(it.summary)
     );
 
     if (all) {
@@ -126,7 +125,10 @@ rssRouter.get("/train-articles", async (req, res) => {
 
     res.json({
       ok: true,
-      page, pageSize, total, items,
+      page,
+      pageSize,
+      total,
+      items,
       cached: isCacheFresh() && !fresh,
     });
   } catch (e) {
@@ -134,7 +136,6 @@ rssRouter.get("/train-articles", async (req, res) => {
     res.status(500).json({ ok: false, message: "Failed to fetch feeds." });
   }
 });
-
 
 // Detail
 const DETAIL_CACHE = new Map();
