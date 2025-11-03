@@ -13,7 +13,7 @@ export default async function sendOTPEmail(to, otp) {
       },
       {
         headers: {
-          Authorization: `Bearer ${process.env.MAILTRAP_TOKEN}`,
+          Authorization: `Bearer 0e47d17d9e687e7cd2d1300a5aa242cb`,
           "Content-Type": "application/json",
         },
         timeout: 10000,
