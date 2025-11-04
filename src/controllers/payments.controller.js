@@ -187,7 +187,7 @@ export const paypalCapture = async (req, res) => {
         .json({ message: "paypal_order_id & valid order_id required" });
     }
 
-    // 👉 Lấy order từ DB để dùng id “chuẩn”
+    // Lấy order từ DB để dùng id “chuẩn”
     const order = await db.Order.findByPk(orderIdNum, { transaction: t });
     if (!order) {
       await t.rollback();
@@ -225,7 +225,7 @@ export const paypalCapture = async (req, res) => {
       const capture = pu?.payments?.captures?.[0];
       const amountValue = capture?.amount?.value || pu?.amount?.value;
 
-      // 👉 Truyền đúng order.id đã xác thực
+      //  Truyền đúng order.id đã xác thực
       await finalizePaidOrder(
         { order_id: order.id, amountValue, paypal_payload: cap.data },
         t

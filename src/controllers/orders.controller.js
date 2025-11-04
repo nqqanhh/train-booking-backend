@@ -74,8 +74,13 @@ const previewOrder = async (req, res) => {
       const price = baseMap.get(it.seat_code);
       if (price == null)
         throw new Error(`Seat ${it.seat_code} not found in template`);
-      total += price;
-      return { seat_code: it.seat_code, passenger_id: it.passenger_id, price };
+      const adjustedPrice = price / 26000;
+      total += adjustedPrice;
+      return {
+        seat_code: it.seat_code,
+        passenger_id: it.passenger_id,
+        price: adjustedPrice,
+      };
     });
 
     res.json({ trip_id, departure_time, items: details, total_amount: total });
