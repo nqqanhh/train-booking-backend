@@ -4,7 +4,7 @@ import db from "../models/index.js";
 import { getPaypalToken, PP_BASE } from "../utils/paypal.js";
 import { generateTickets } from "./tickets.controller.js";
 import { ensureTripSeatsForTrip } from "../services/tripseat.service.js";
-import { isColString, Op } from "sequelize/lib/utils";
+import { Op } from "sequelize";
 
 // Destructure tất cả model thực sự dùng
 const { Order, Payment, OrderItem, Carriage, TripSeat } = db;
