@@ -20,10 +20,10 @@ const finalizePaidOrder = async (
     { where: { id: order_id }, transaction: t }
   );
 
-  // Update payment status to 'completed'
+  // Update payment status to 'succeeded'
   await Payment.update(
     {
-      status: "completed",
+      status: "succeeded",
       amount: amountValue,
       paypal_payload: JSON.stringify(paypal_payload),
     },
