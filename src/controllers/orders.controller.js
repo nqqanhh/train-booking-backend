@@ -211,6 +211,7 @@ const createOrder = async (req, res) => {
     console.error("[createOrder SQL err]", {
       sqlMessage: error?.original?.sqlMessage,
       sql: error?.original?.sql,
+      message: error.message,
     });
     return res.status(500).json({
       message: "create-order failed",
