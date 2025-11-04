@@ -233,7 +233,27 @@ export const paypalCapture = async (req, res) => {
 
       try {
         await generateTickets(order.id);
-      } catch {}
+      } catch (e) {
+        console.error(
+          "[TICKETS][GEN] failed",
+          e?.name,
+          e?.errors || e?.message
+        );
+        // middleware bắt lỗi chung hoặc ngay trong catch của controller
+        if (
+          e.name === "SequelizeValidationError" ||
+          e.name === "SequelizeUniqueConstraintError"
+        ) {
+          return res.status(400).json({
+            message: "Validation error",
+            errors: e.errors?.map((er) => ({
+              path: er.path,
+              msg: er.message,
+              value: er.value,
+            })),
+          });
+        }
+      }
 
       return res
         .status(200)
