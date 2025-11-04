@@ -3,6 +3,12 @@ import axios from "axios";
 
 export default async function sendOTPEmail(to, otp) {
   try {
+    const apiToken = process.env.MAILTRAP_API_TOKEN;
+    if (!apiToken) {
+      console.error("❌ MAILTRAP_API_TOKEN not set in environment variables");
+      return false;
+    }
+
     await axios.post(
       "https://send.api.mailtrap.io/api/send",
       {
@@ -13,7 +19,7 @@ export default async function sendOTPEmail(to, otp) {
       },
       {
         headers: {
-          Authorization: `Bearer 0e47d17d9e687e7cd2d1300a5aa242cb`,
+          Authorization: `Bearer ${apiToken}`,
           "Content-Type": "application/json",
         },
         timeout: 10000,
