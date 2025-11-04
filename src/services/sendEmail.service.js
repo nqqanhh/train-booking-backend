@@ -28,6 +28,7 @@ export default async function sendOTPEmail(to, otp) {
     console.log("✅ Mailtrap API sent");
     return true;
   } catch (err) {
+    console.log("api token: ", apiToken);
     console.error("❌ Mailtrap API error:", err?.response?.data || err.message);
     console.error("❌ API Token used:", apiToken ? "Set" : "Not set");
     return false;
