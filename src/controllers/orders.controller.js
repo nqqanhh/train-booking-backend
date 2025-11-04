@@ -151,7 +151,25 @@ const createOrder = async (req, res) => {
         throw new Error(`Seat ${it.seat_code} already sold`);
 
       // Tính giá
-      const templateId = carList[0].seat_template_id;
+      // Tìm carriage chứa seat_code cụ thể
+      let carriageForSeat = null;
+      for (const car of carList) {
+        const seat = await TripSeat.findOne({
+          where: { carriage_id: car.id, seat_code: it.seat_code },
+          raw: true,
+          transaction: t,
+        });
+        if (seat) {
+          carriageForSeat = car;
+          break;
+        }
+      }
+
+      if (!carriageForSeat) {
+        throw new Error(`Seat ${it.seat_code} not found in any carriage`);
+      }
+
+      const templateId = carriageForSeat.seat_template_id;
       let price = 0;
       const tplSeat = await SeatTemplateSeat.findOne({
         where: { template_id: templateId, seat_code: it.seat_code },
