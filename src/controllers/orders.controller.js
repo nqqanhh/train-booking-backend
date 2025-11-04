@@ -158,8 +158,7 @@ const createOrder = async (req, res) => {
         raw: true,
         transaction: t,
       });
-      adjustedPrice = Number(tplSeat?.base_price || 0) / 26000;
-      price += adjustedPrice;
+      price = Number(tplSeat?.base_price || 0) / 26000;
       total += price;
       orderItemsPayload.push({
         trip_id: it.trip_id,
