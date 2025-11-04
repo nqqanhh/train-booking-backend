@@ -158,6 +158,7 @@ const createOrder = async (req, res) => {
         raw: true,
         transaction: t,
       });
+
       price = Number(tplSeat?.base_price || 0) / 10000;
       total += price;
       orderItemsPayload.push({
