@@ -4,10 +4,55 @@ import db from "../models/index.js";
 import { getPaypalToken, PP_BASE } from "../utils/paypal.js";
 import { generateTickets } from "./tickets.controller.js";
 import { ensureTripSeatsForTrip } from "../services/tripseat.service.js";
-import { isColString } from "sequelize/lib/utils";
+import { isColString, Op } from "sequelize/lib/utils";
 
 // Destructure tất cả model thực sự dùng
 const { Order, Payment, OrderItem, Carriage, TripSeat } = db;
+
+/** Finalize paid order: update status, payment, and TripSeat */
+const finalizePaidOrder = async (
+  { order_id, amountValue, paypal_payload },
+  t
+) => {
+  // Update order status to 'paid'
+  await Order.update(
+    { status: "paid" },
+    { where: { id: order_id }, transaction: t }
+  );
+
+  // Update payment status to 'completed'
+  await Payment.update(
+    {
+      status: "completed",
+      amount: amountValue,
+      paypal_payload: JSON.stringify(paypal_payload),
+    },
+    { where: { order_id }, transaction: t }
+  );
+
+  // Update TripSeat sold_at for all order items
+  const orderItems = await OrderItem.findAll({
+    where: { order_id },
+    attributes: ["id"],
+    transaction: t,
+  });
+  const orderItemIds = orderItems.map((oi) => oi.id);
+
+  if (orderItemIds.length > 0) {
+    await TripSeat.update(
+      { sold_at: new Date() },
+      { where: { order_item_id: { [Op.in]: orderItemIds } }, transaction: t }
+    );
+  }
+
+  // Generate tickets after payment is finalized
+  try {
+    await generateTickets(order_id, t);
+  } catch (ticketError) {
+    console.error("Failed to generate tickets:", ticketError);
+    // Don't fail the payment if ticket generation fails
+  }
+};
 
 /** Tạo PayPal order */
 export const paypalCreateOrder = async (req, res) => {
@@ -91,81 +136,81 @@ export const paypalCreateOrder = async (req, res) => {
 };
 
 /** Hoàn tất cập nhật DB sau khi PayPal xác nhận đã capture */
-async function finalizePaidOrder({ order_id, amountValue, paypal_payload }, t) {
-  const { Order, Payment, OrderItem, Carriage, TripSeat } = db;
+// async function finalizePaidOrder({ order_id, amountValue, paypal_payload }, t) {
+//   const { Order, Payment, OrderItem, Carriage, TripSeat } = db;
 
-  // Double-check order
-  const order = await Order.findByPk(order_id, { transaction: t, raw: true });
-  if (!order) throw new Error(`Order ${order_id} not found`);
+//   // Double-check order
+//   const order = await Order.findByPk(order_id, { transaction: t, raw: true });
+//   if (!order) throw new Error(`Order ${order_id} not found`);
 
-  const amountStr = Number(amountValue || 0).toFixed(2);
+//   const amountStr = Number(amountValue || 0).toFixed(2);
 
-  const pu = paypal_payload?.purchase_units?.[0];
-  const cap = pu?.payments?.captures?.[0];
-  const txnId = cap?.id || paypal_payload?.id || `paypal-${Date.now()}`;
+//   const pu = paypal_payload?.purchase_units?.[0];
+//   const cap = pu?.payments?.captures?.[0];
+//   const txnId = cap?.id || paypal_payload?.id || `paypal-${Date.now()}`;
 
-  // upsert payment
-  let payment = await Payment.findOne({
-    where: { order_id: order.id, provider: "paypal", provider_txn_id: txnId },
-    transaction: t,
-  });
-  if (payment) {
-    payment.status = "succeeded";
-    payment.amount = amountStr;
-    payment.raw_payload = paypal_payload;
-    await payment.save({ transaction: t });
-  } else {
-    await Payment.create(
-      {
-        order_id: order.id,
-        provider: "paypal",
-        provider_txn_id: txnId,
-        amount: amountStr,
-        status: "succeeded",
-        raw_payload: paypal_payload,
-      },
-      { transaction: t }
-    );
-  }
+//   // upsert payment
+//   let payment = await Payment.findOne({
+//     where: { order_id: order.id, provider: "paypal", provider_txn_id: txnId },
+//     transaction: t,
+//   });
+//   if (payment) {
+//     payment.status = "succeeded";
+//     payment.amount = amountStr;
+//     payment.raw_payload = paypal_payload;
+//     await payment.save({ transaction: t });
+//   } else {
+//     await Payment.create(
+//       {
+//         order_id: order.id,
+//         provider: "paypal",
+//         provider_txn_id: txnId,
+//         amount: amountStr,
+//         status: "succeeded",
+//         raw_payload: paypal_payload,
+//       },
+//       { transaction: t }
+//     );
+//   }
 
-  await Order.update(
-    { status: "paid", total_amount: amountStr },
-    { where: { id: order.id }, transaction: t }
-  );
+//   await Order.update(
+//     { status: "paid", total_amount: amountStr },
+//     { where: { id: order.id }, transaction: t }
+//   );
 
-  const items = await OrderItem.findAll({
-    where: { order_id: order.id },
-    attributes: ["id", "trip_id", "seat_code"],
-    transaction: t,
-    raw: true,
-  });
-  if (!items.length) return;
+//   const items = await OrderItem.findAll({
+//     where: { order_id: order.id },
+//     attributes: ["id", "trip_id", "seat_code"],
+//     transaction: t,
+//     raw: true,
+//   });
+//   if (!items.length) return;
 
-  const tripIds = [...new Set(items.map((i) => i.trip_id))];
-  for (const tripId of tripIds) {
-    await ensureTripSeatsForTrip(tripId, t); // không commit/rollback ở đây
-  }
+//   const tripIds = [...new Set(items.map((i) => i.trip_id))];
+//   for (const tripId of tripIds) {
+//     await ensureTripSeatsForTrip(tripId, t); // không commit/rollback ở đây
+//   }
 
-  const now = new Date();
-  for (const it of items) {
-    const cars = await Carriage.findAll({
-      where: { trip_id: it.trip_id },
-      attributes: ["id"],
-      transaction: t,
-      raw: true,
-    });
-    const carIds = cars.map((c) => c.id);
-    if (!carIds.length) continue;
+//   const now = new Date();
+//   for (const it of items) {
+//     const cars = await Carriage.findAll({
+//       where: { trip_id: it.trip_id },
+//       attributes: ["id"],
+//       transaction: t,
+//       raw: true,
+//     });
+//     const carIds = cars.map((c) => c.id);
+//     if (!carIds.length) continue;
 
-    await TripSeat.update(
-      { order_item_id: it.id, sold_at: now, status: "sold" },
-      {
-        where: { carriage_id: carIds, seat_code: it.seat_code },
-        transaction: t,
-      }
-    );
-  }
-}
+//     await TripSeat.update(
+//       { order_item_id: it.id, sold_at: now, status: "sold" },
+//       {
+//         where: { carriage_id: carIds, seat_code: it.seat_code },
+//         transaction: t,
+//       }
+//     );
+//   }
+// }
 
 /** Capture PayPal order (idempotent) */
 // Trong paypalCapture:

@@ -1,6 +1,7 @@
 // src/controllers/tickets.controller.js
 import db from "../models/index.js";
-const { Ticket, OrderItem, Trip, Route, PassengerProfile } = db;
+const { Ticket, OrderItem, Trip, Route, PassengerProfile, Carriage, TripSeat } =
+  db;
 
 /**
  * Tạo ticket cho toàn bộ OrderItems thuộc 1 order.
@@ -23,23 +24,22 @@ export async function generateTickets(orderId, tExternal = null) {
 
     const out = [];
     for (const it of items) {
-      // Đánh dấu ghế sold: tìm TripSeat theo (carriage_id từ Carriage.trip_id, seat_code)
-      const carriages = await db.Carriage.findAll({
-        where: { trip_id: it.trip_id },
-        attributes: ["id"],
-        transaction: t,
-      });
-      const carriageIds = carriages.map((c) => c.id);
-      if (carriageIds.length) {
-        await db.TripSeat.update(
-          { order_item_id: it.id, sold_at: new Date() },
-          {
-            where: { carriage_id: carriageIds, seat_code: it.seat_code },
-            transaction: t,
-          }
-        );
-      }
-
+      //       // Đánh dấu ghế sold: tìm TripSeat theo (carriage_id từ Carriage.trip_id, seat_code)
+      // const carriages = await db.Carriage.findAll({
+      //   where: { trip_id: it.trip_id },
+      //   attributes: ["id"],
+      //   transaction: t,
+      // });
+      // const carriageIds = carriages.map((c) => c.id);
+      // if (carriageIds.length) {
+      //   await db.TripSeat.update(
+      //     { order_item_id: it.id, sold_at: new Date() },
+      //     {
+      //       where: { carriage_id: carriageIds, seat_code: it.seat_code },
+      //       transaction: t,
+      //     }
+      //   );
+      // }
       // Ticket 1–1 với OrderItem
       const qrObj = { order_item_id: it.id, seat_code: it.seat_code };
       const [ticket] = await db.Ticket.findOrCreate({
