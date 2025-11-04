@@ -230,6 +230,11 @@ export const paypalCapture = async (req, res) => {
         { order_id: order.id, amountValue, paypal_payload: cap.data },
         t
       );
+      console.log({
+        order_id: order.id,
+        amountValue,
+        paypal_payload: cap.data,
+      });
       await t.commit();
 
       try {
