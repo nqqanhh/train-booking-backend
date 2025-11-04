@@ -1,6 +1,6 @@
 // services/sendEmail.service.js
 import axios from "axios";
-
+import "dotenv/config";
 export default async function sendOTPEmail(to, otp) {
   try {
     const apiToken = process.env.MAILTRAP_API_TOKEN;
@@ -29,6 +29,7 @@ export default async function sendOTPEmail(to, otp) {
     return true;
   } catch (err) {
     console.error("❌ Mailtrap API error:", err?.response?.data || err.message);
+    console.error("❌ API Token used:", apiToken ? "Set" : "Not set");
     return false;
   }
 }
