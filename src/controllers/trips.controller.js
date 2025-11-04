@@ -344,17 +344,17 @@ export const generateSeatsForTrip = async (req, res) => {
 export const getOneTrip = async (req, res) => {
   try {
     const id = req.params;
-    const trip = await Trip.findOne(id );
+    const trip = await Trip.findOne(id);
     console.log("trip", trip);
     res.status(200).json({
       message: "OK",
       trip,
     });
   } catch (error) {
+    console.log(error.message);
     return res.status(500).json({
       message: "Get trip header failed" + error.message,
     });
-    console.log(error.message)
   }
 };
 const tripController = {
