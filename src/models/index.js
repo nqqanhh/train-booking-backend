@@ -6,7 +6,7 @@ import { Sequelize, DataTypes } from "sequelize";
 import process from "process";
 import { fileURLToPath, pathToFileURL } from "url";
 import { createRequire } from "module";
-
+import "dotenv/config";
 const require = createRequire(import.meta.url);
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -28,7 +28,13 @@ let sequelize;
 // ─────────────────────────────────────────────────────────────
 if (config.use_env_variable) {
   // ví dụ: process.env[config.use_env_variable] = "mysql://user:pass@host:3306/dbname"
-  sequelize = new Sequelize(process.env[config.use_env_variable], {
+  const dbUrl = process.env[config.use_env_variable];
+  if (!dbUrl) {
+    throw new Error(
+      `Environment variable ${config.use_env_variable} is not set`
+    );
+  }
+  sequelize = new Sequelize(dbUrl, {
     ...config,
     logging: process.env.NODE_ENV === "development" ? console.log : false,
     timezone: "+07:00",
