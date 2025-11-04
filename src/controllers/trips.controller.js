@@ -354,6 +354,7 @@ export const getOneTrip = async (req, res) => {
     return res.status(500).json({
       message: "Get trip header failed" + error.message,
     });
+    console.log(error.message)
   }
 };
 const tripController = {
