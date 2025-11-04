@@ -34,6 +34,7 @@ if (config.use_env_variable) {
       `Environment variable ${config.use_env_variable} is not set`
     );
   }
+  
   sequelize = new Sequelize(dbUrl, {
     ...config,
     logging: process.env.NODE_ENV === "development" ? console.log : false,
