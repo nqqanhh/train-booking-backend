@@ -4,6 +4,7 @@ import db from "../models/index.js";
 import { getPaypalToken, PP_BASE } from "../utils/paypal.js";
 import { generateTickets } from "./tickets.controller.js";
 import { ensureTripSeatsForTrip } from "../services/tripseat.service.js";
+import { isColString } from "sequelize/lib/utils";
 
 // Destructure tất cả model thực sự dùng
 const { Order, Payment, OrderItem, Carriage, TripSeat } = db;
@@ -232,6 +233,7 @@ export const paypalCapture = async (req, res) => {
       await t.commit();
 
       try {
+        console.log("generating ticket");
         await generateTickets(order.id);
       } catch (e) {
         console.error(
@@ -239,6 +241,7 @@ export const paypalCapture = async (req, res) => {
           e?.name,
           e?.errors || e?.message
         );
+        console.log("[TICKETS][GEN] failed", e?.name, e?.errors || e?.message);
         // middleware bắt lỗi chung hoặc ngay trong catch của controller
         if (
           e.name === "SequelizeValidationError" ||
