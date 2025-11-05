@@ -242,7 +242,7 @@ const createOrder = async (req, res) => {
 //admin
 const getAllOrders = async (req, res) => {
   try {
-    const routes = await Order.findall();
+    const routes = await Order.findAll();
     res.status(200).json({
       message: "OK",
       routes,
