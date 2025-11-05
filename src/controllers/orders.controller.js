@@ -239,5 +239,33 @@ const createOrder = async (req, res) => {
     });
   }
 };
-
-export default { previewOrder, createOrder };
+//admin
+const getAllOrders = async (req, res) => {
+  try {
+    const routes = await Order.findall();
+    res.status(200).json({
+      message: "OK",
+      routes,
+    });
+  } catch (error) {
+    res.status(500).json({
+      message: "error " + error.message,
+    });
+  }
+};
+const getOrderDetail = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const order = await Order.findByPk(id);
+    if (!order) return res.status(404).json({ message: "order not found" });
+    res.status(200).json({
+      message: "OK",
+      order,
+    });
+  } catch (error) {
+    res.status(500).json({
+      message: "error " + error.message,
+    });
+  }
+};
+export default { previewOrder, createOrder, getAllOrders,getOrderDetail};
