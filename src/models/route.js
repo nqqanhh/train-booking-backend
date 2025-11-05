@@ -24,8 +24,8 @@ export default (sequelize, DataTypes) => {
       tableName: "Routes",
       timestamps: true,
       underscored: true, // <-- quan trọng
-      createdAt: "created_at", // (tùy chọn) tường minh
-      updatedAt: "updated_at", // (tùy chọn)
+      created_at: "created_at", // (tùy chọn) tường minh
+      updated_at: "updated_at", // (tùy chọn)
     }
   );
 
