@@ -6,7 +6,9 @@ import authorizationToken from "../middlewares/auth.middleware.js";
 const usersRouter = Router();
 
 usersRouter.get("/me", userController.getMyProfile, authorizationToken);
-usersRouter.get("/users", userController.getAllUsers);
 usersRouter.patch("/me", userController.updateMyProfile);
 usersRouter.patch("/me/password", userController.changePassword);
+//admin
+usersRouter.get("/users", userController.getAllUsers);
+usersRouter.post("/:id", userController.setStatusUser);
 export default usersRouter;

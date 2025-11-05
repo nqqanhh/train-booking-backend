@@ -79,10 +79,28 @@ const getAllUsers = async (req, res) => {
     });
   }
 };
+
+const setStatusUser = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const user = User.findByPk(id);
+    user.status === "active" ? "banned" : "active";
+    await user.save();
+    res.status(200).json({
+      message: "OK",
+      user,
+    });
+  } catch (error) {
+    res.status(500).json({
+      message: "error:" + error.message,
+    });
+  }
+};
 const userController = {
   getMyProfile,
   updateMyProfile,
   changePassword,
   getAllUsers,
+  setStatusUser,
 };
 export default userController;
