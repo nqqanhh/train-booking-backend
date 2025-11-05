@@ -1,6 +1,9 @@
 // services/sendEmail.service.js
 import nodemailer from "nodemailer";
+import { Resend } from 'resend';
+import 'dotenv/config';
 
+const resend = new Resend(process.env.RESEND_API_KEY);
 export default async function sendOTPEmail(to, otp) {
   try {
     // Option 1: Use Gmail SMTP (requires Gmail app password)

@@ -15,8 +15,8 @@ export default (sequelize, DataTypes) => {
       distance_km: { type: DataTypes.DECIMAL(8, 2) },
       eta_minutes: { type: DataTypes.SMALLINT },
       active: { type: DataTypes.BOOLEAN, allowNull: false, defaultValue: true },
-      createdAt: { type: DataTypes.DATE, allowNull: false },
-      updatedAt: { type: DataTypes.DATE, allowNull: false },
+      created_at: { type: DataTypes.DATE, allowNull: false },
+      created_at: { type: DataTypes.DATE, allowNull: false },
     },
     {
       sequelize,
