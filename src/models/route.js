@@ -16,7 +16,7 @@ export default (sequelize, DataTypes) => {
       eta_minutes: { type: DataTypes.SMALLINT },
       active: { type: DataTypes.BOOLEAN, allowNull: false, defaultValue: true },
       created_at: { type: DataTypes.DATE, allowNull: false },
-      created_at: { type: DataTypes.DATE, allowNull: false },
+      updated_at: { type: DataTypes.DATE, allowNull: false },
     },
     {
       sequelize,
