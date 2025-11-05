@@ -83,8 +83,11 @@ const getAllUsers = async (req, res) => {
 const setStatusUser = async (req, res) => {
   try {
     const { id } = req.params;
-    const user = User.findByPk(id);
-    user.status === "active" ? "banned" : "active";
+    const user = await User.findByPk(id);
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+    user.status = user.status === "active" ? "banned" : "active";
     await user.save();
     res.status(200).json({
       message: "OK",
