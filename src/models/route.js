@@ -15,8 +15,6 @@ export default (sequelize, DataTypes) => {
       distance_km: { type: DataTypes.DECIMAL(8, 2) },
       eta_minutes: { type: DataTypes.SMALLINT },
       active: { type: DataTypes.BOOLEAN, allowNull: false, defaultValue: true },
-      created_at: { type: DataTypes.DATE, allowNull: false },
-      updated_at: { type: DataTypes.DATE, allowNull: false },
     },
     {
       sequelize,
@@ -24,8 +22,8 @@ export default (sequelize, DataTypes) => {
       tableName: "Routes",
       timestamps: true,
       underscored: true, // <-- quan trọng
-      created_at: "created_at", // (tùy chọn) tường minh
-      updated_at: "updated_at", // (tùy chọn)
+      createdAt: "created_at", // <— quan trọng
+      updatedAt: "updated_at", // <— quan trọng
     }
   );
 
