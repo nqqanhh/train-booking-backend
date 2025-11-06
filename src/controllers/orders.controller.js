@@ -268,4 +268,6 @@ const getOrderDetail = async (req, res) => {
     });
   }
 };
+
+
 export default { previewOrder, createOrder, getAllOrders,getOrderDetail};

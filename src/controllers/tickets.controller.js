@@ -11,6 +11,7 @@ const {
   Order,
 } = db;
 import { Op } from "sequelize";
+import { normalizePayload } from "../utils/normalize-payload.js";
 
 /**
  * Tạo ticket cho toàn bộ OrderItems thuộc 1 order.
@@ -340,6 +341,41 @@ export const getTicketById = async (req, res) => {
   }
 };
 
+export const getTicketByQrPayload = async (req, res) => {
+  try {
+    const { qr_payload } = req.body || {};
+    if (!qr_payload) {
+      return res.status(400).json({ message: "qr_payload required" });
+    }
+
+    const normalized = normalizePayload(qr_payload);
+
+    const ticket = await Ticket.findOne({
+      where: { qr_payload: { [Op.eq]: normalized } },
+      include: [
+        {
+          model: OrderItem,
+          as: "order_item",
+          include: [
+            {
+              model: Trip,
+              as: "trip",
+              include: [{ model: Route, as: "route" }],
+            },
+          ],
+        },
+      ],
+    });
+
+    if (!ticket) return res.status(404).json({ message: "Ticket not found" });
+
+    return res.status(200).json({ message: "OK", ticket });
+  } catch (error) {
+    return res
+      .status(500)
+      .json({ message: "Internal error: " + error.message });
+  }
+};
 //admin mark used
 export const markUsed = async (req, res) => {
   const t = await db.sequelize.transaction();
