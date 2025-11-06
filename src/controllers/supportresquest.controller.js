@@ -1,10 +1,14 @@
 import db from "../models/index.js";
 
-const { SupportRequest } = db;
+const { SupportRequest, User } = db;
 
 export const getAllRequests = async (req, res) => {
   try {
-    const supReq = await SupportRequest.findAll();
+    const supReq = await SupportRequest.findAll({
+      include: [
+        { model: User, as: "user", attributes: ["full_name", "email"] },
+      ],
+    });
     res.status(200).json({
       message: "OK",
       supReq,
@@ -34,4 +38,3 @@ export const sendSuportRequest = async (req, res) => {
     });
   }
 };
-
