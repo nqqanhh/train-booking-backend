@@ -1,7 +1,16 @@
 // src/controllers/tickets.controller.js
 import db from "../models/index.js";
-const { Ticket, OrderItem, Trip, Route, PassengerProfile, Carriage, TripSeat } =
-  db;
+const {
+  Ticket,
+  OrderItem,
+  Trip,
+  Route,
+  PassengerProfile,
+  Carriage,
+  TripSeat,
+  Order,
+} = db;
+import { Op } from "sequelize";
 
 /**
  * Tạo ticket cho toàn bộ OrderItems thuộc 1 order.
@@ -68,6 +77,7 @@ export async function generateTickets(orderId, tExternal = null) {
 /** POST /tickets/validate */
 export const validateTicket = async (req, res) => {
   try {
+    const { id } = req.params;
     const { qr_payload, trip_id: tripIdFromClient } = req.body || {};
     if (!qr_payload)
       return res.status(400).json({ message: "Missing QR payload" });
@@ -220,7 +230,14 @@ export const getTicketById = async (req, res) => {
         {
           model: OrderItem,
           as: "order_item",
-          attributes: ["id", "trip_id", "seat_code", "price", "created_at"],
+          attributes: [
+            "id",
+            "order_id",
+            "trip_id",
+            "seat_code",
+            "price",
+            "created_at",
+          ],
           include: [
             {
               model: Trip,
@@ -272,6 +289,8 @@ export const getTicketById = async (req, res) => {
         issued_at: ticket.issued_at,
         used_at: ticket.used_at,
         qr_payload: ticket.qr_payload,
+        order_id: ticket.order_item?.order_id,
+        order_item_id: ticket.order_item?.id,
       },
       seat: {
         seat_code: oi.seat_code,
@@ -318,5 +337,146 @@ export const getTicketById = async (req, res) => {
       detail: error.message,
       sqlMsg: error.sql,
     });
+  }
+};
+
+//admin mark used
+export const markUsed = async (req, res) => {
+  const t = await db.sequelize.transaction();
+  try {
+    const { id } = req.params;
+
+    const ticket = await Ticket.findByPk(id, {
+      include: [{ model: OrderItem, as: "order_item" }],
+      transaction: t,
+      lock: t.LOCK.UPDATE,
+    });
+    if (!ticket) {
+      await t.rollback();
+      return res.status(404).json({
+        message: "Ticket not found",
+      });
+    }
+    if (ticket.status !== "valid") {
+      await t.rollback;
+      return res.status(400).json({
+        message: `Ticket is ${ticket.status}`,
+      });
+    }
+    ticket.status = "used";
+    ticket.used_at = new Date();
+    await ticket.save({ transaction: t });
+
+    await t.commit();
+    res.status(200).json({
+      message: "Ticket marked used",
+      ticket,
+    });
+  } catch (e) {
+    await t.rollback();
+    res.status(500).json({
+      message: "Internal error",
+      detail: e.message,
+    });
+  }
+};
+
+//admin refund
+export const adminRefundTicket = async (req, res) => {
+  const t = await db.sequelize.transaction();
+  try {
+    const { id } = req.params; // ticket id
+    const { reason } = req.body || {};
+    // TODO: kiểm tra quyền admin/staff từ middleware trước đó
+
+    // Lock ticket row để tránh race
+    const ticket = await Ticket.findByPk(id, {
+      include: [{ model: OrderItem, as: "order_item" }],
+      transaction: t,
+      lock: t.LOCK.UPDATE,
+    });
+    if (!ticket) {
+      await t.rollback();
+      return res.status(404).json({ message: "Ticket not found" });
+    }
+
+    if (ticket.status === "refunded") {
+      await t.rollback();
+      return res.status(409).json({ message: "Ticket already refunded" });
+    }
+    if (ticket.status === "used") {
+      await t.rollback();
+      return res.status(400).json({ message: "Cannot refund a used ticket" });
+    }
+
+    const oi = ticket.order_item;
+    if (!oi) {
+      await t.rollback();
+      return res.status(400).json({ message: "Ticket has no order item" });
+    }
+
+    // 1) giải phóng ghế (nếu đã gán)
+    const carriages = await Carriage.findAll({
+      where: { trip_id: oi.trip_id },
+      attributes: ["id"],
+      raw: true,
+      transaction: t,
+    });
+    const carriageIds = carriages.map((c) => c.id);
+    if (carriageIds.length) {
+      await TripSeat.update(
+        { order_item_id: null },
+        {
+          where: {
+            carriage_id: { [Op.in]: carriageIds },
+            seat_code: oi.seat_code,
+            order_item_id: oi.id, // idempotent: chỉ gỡ nếu đang gán đúng item này
+          },
+          transaction: t,
+        }
+      );
+    }
+
+    // 2) mark order_item refunded
+    await OrderItem.update(
+      { status: "refunded", refunded_at: new Date() },
+      { where: { id: oi.id }, transaction: t }
+    );
+
+    // 3) mark ticket refunded
+    ticket.status = "refunded";
+    ticket.refunded_at = new Date();
+    ticket.refund_reason = reason ?? null;
+    await ticket.save({ transaction: t });
+
+    // 4) (tuỳ chọn) cập nhật Order.total_amount
+    const items = await OrderItem.findAll({
+      where: { order_id: oi.order_id },
+      attributes: ["price", "status"],
+      raw: true,
+      transaction: t,
+    });
+    const newTotal = items.reduce(
+      (sum, x) => sum + (x.status === "refunded" ? 0 : Number(x.price || 0)),
+      0
+    );
+    await Order.update(
+      { total_amount: newTotal.toFixed(2) },
+      { where: { id: oi.order_id }, transaction: t }
+    );
+
+    // 5) (tuỳ chọn) gọi PSP refund, lưu Payment/Refund record
+
+    await t.commit();
+    return res.json({
+      message: "Ticket refunded",
+      ticket_id: ticket.id,
+      order_id: oi.order_id,
+    });
+  } catch (e) {
+    await t.rollback();
+    return res
+      .status(500)
+      .json({ message: "refund failed", detail: e.message });
   }
 };

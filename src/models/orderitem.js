@@ -30,6 +30,15 @@ export default (sequelize, DataTypes) => {
       seat_code: { type: DataTypes.STRING(32), allowNull: false },
       passenger_id: { type: DataTypes.BIGINT, allowNull: false },
       price: { type: DataTypes.DECIMAL(12, 2), allowNull: false },
+      status: {
+        type: DataTypes.ENUM("active", "refunded", "cancelled"),
+        allowNull: false,
+        defaultValue: "active",
+      },
+      refunded_at: {
+        type: DataTypes.DATE,
+        allowNull: true,
+      },
     },
     {
       sequelize,

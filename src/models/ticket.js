@@ -16,10 +16,12 @@ export default (sequelize, DataTypes) => {
       order_item_id: { type: DataTypes.BIGINT, allowNull: false, unique: true },
       qr_payload: { type: DataTypes.TEXT, allowNull: false },
       status: {
-        type: DataTypes.ENUM("valid", "used", "refunded"),
+        type: DataTypes.ENUM("valid", "used", "refunded", "void"),
         allowNull: false,
         defaultValue: "valid",
       },
+      refunded_at: DataTypes.DATE,
+      refund_reason: DataTypes.STRING(255),
       issued_at: { type: DataTypes.DATE, allowNull: false },
       used_at: { type: DataTypes.DATE },
     },

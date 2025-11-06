@@ -111,7 +111,8 @@ export const getMyTickets = async (req, res) => {
     } else if (status === "used") {
       tickets = tickets.filter((x) => x.status === "used");
     } else if (status === "refunded") {
-      tickets = tickets.filter((x) => new Date(x.trip?.departure_time) > now);
+      // tickets = tickets.filter((x) => new Date(x.trip?.departure_time) > now);
+      tickets = tickets.filter((x) => x.status === "refunded");
     }
 
     res.json({ items: tickets, count: tickets.length });

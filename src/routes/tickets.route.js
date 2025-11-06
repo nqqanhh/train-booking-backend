@@ -5,11 +5,16 @@ import {
   validateTicket,
   getAllTickets,
   getTicketById,
+  markUsed,
+  adminRefundTicket,
 } from "../controllers/tickets.controller.js";
+import { isAdmin } from "../middlewares/rbac.js";
 
 const ticketsRouter = Router();
-ticketsRouter.post("/validate", validateTicket);
+ticketsRouter.post("/:id/validate", validateTicket);
 ticketsRouter.get("/by-order/:orderId", listTicketsByOrder);
 ticketsRouter.get("/", getAllTickets);
 ticketsRouter.get("/:id", getTicketById);
+ticketsRouter.post("/:id/mark-used", markUsed);
+ticketsRouter.post("/:id/refund", adminRefundTicket);
 export default ticketsRouter;
