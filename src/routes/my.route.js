@@ -5,5 +5,5 @@ const myRouter = Router();
 
 myRouter.get("/orders", myController.getMyOrder);
 myRouter.get("/ticket", myController.getMyTickets);
-
+myRouter.get("/support-requests", myController.getMySupportRequest);
 export default myRouter;

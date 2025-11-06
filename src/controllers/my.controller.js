@@ -1,5 +1,5 @@
 import db from "../models/index.js";
-const { Order, OrderItem, Ticket } = db;
+const { Order, OrderItem, Ticket, SupportRequest } = db;
 
 const getMyOrder = async (req, res) => {
   const orders = await Order.findAll({
@@ -121,5 +121,20 @@ export const getMyTickets = async (req, res) => {
   }
 };
 
-const myController = { getMyOrder, getMyTickets };
+const getMySupportRequest = async (req, res) => {
+  try {
+    const myReq = await SupportRequest.findAll({
+      where: { user_id: req.user.id },
+    });
+    res.status(200).json({
+      message: "OK",
+      myReq,
+    });
+  } catch (error) {
+    res.status(500).json({
+      message: "Internal error: " + error.message,
+    });
+  }
+};
+const myController = { getMyOrder, getMyTickets, getMySupportRequest };
 export default myController;
