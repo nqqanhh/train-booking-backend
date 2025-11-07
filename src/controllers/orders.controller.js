@@ -11,6 +11,7 @@ const {
   Order,
   OrderItem,
   PassengerProfile,
+  Payment,
 } = db;
 
 /**
@@ -256,7 +257,56 @@ const getAllOrders = async (req, res) => {
 const getOrderDetail = async (req, res) => {
   try {
     const { id } = req.params;
-    const order = await Order.findByPk(id);
+    const order = await Order.findByPk(id, {
+      include: [
+        {
+          model: OrderItem,
+          as: "items",
+          attributes: [
+            "id",
+            "order_id",
+            "trip_id",
+            "seat_code",
+            "price",
+            "created_at",
+          ],
+          include: [
+            {
+              model: Trip,
+              as: "trip",
+              attributes: [
+                "id",
+                "route_id",
+                "vehicle_no",
+                "departure_time",
+                "arrival_time",
+                "status",
+              ],
+            },
+          ],
+          include: [
+            {
+              model: PassengerProfile,
+              as: "passenger",
+              attributes: ["full_name"],
+            },
+          ],
+        },
+        {
+          model: Payment,
+          as: "payments",
+          attributes: [
+            "id",
+            "order_id",
+            "provider",
+            "provider_txn_id",
+            "amount",
+            "status",
+            "raw_payload",
+          ],
+        },
+      ],
+    });
     if (!order) return res.status(404).json({ message: "order not found" });
     res.status(200).json({
       message: "OK",
@@ -269,5 +319,4 @@ const getOrderDetail = async (req, res) => {
   }
 };
 
-
-export default { previewOrder, createOrder, getAllOrders,getOrderDetail};
+export default { previewOrder, createOrder, getAllOrders, getOrderDetail };
