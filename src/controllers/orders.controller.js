@@ -1,4 +1,4 @@
-import { Op } from "sequelize";
+import Sequelize, { Op } from "sequelize";
 import db from "../models/index.js";
 
 const {
@@ -319,4 +319,121 @@ const getOrderDetail = async (req, res) => {
   }
 };
 
-export default { previewOrder, createOrder, getAllOrders, getOrderDetail };
+export async function listOrders(req, res) {
+  const { status, from, to } = req.query;
+  const where = {};
+  if (status) where.status = status;
+  if (from) where.created_at = { [Op.gte]: new Date(from) };
+  if (to)
+    where.created_at = {
+      ...(where.created_at || {}),
+      [Op.lt]: new Date(new Date(to).getTime() + 86400000),
+    };
+
+  const orders = await Order.findAll({
+    where,
+    include: [{ model: OrderItem, as: "items", attributes: ["id"] }],
+    order: [["created_at", "ASC"]],
+  });
+  res.json({ items: orders });
+}
+
+export async function getOrderMetrics(req, res) {
+  try {
+    const from = req.query.from ? new Date(req.query.from) : null;
+    const to = req.query.to ? new Date(req.query.to) : null;
+
+    const wherePaid = { status: "paid" };
+    if (from) wherePaid.created_at = { [Op.gte]: from };
+    if (to) {
+      wherePaid.created_at = {
+        ...(wherePaid.created_at || {}),
+        [Op.lt]: new Date(to.getTime() + 24 * 3600 * 1000),
+      };
+    }
+
+    // KPI tổng
+    const totals = await Order.findAll({
+      where: wherePaid,
+      attributes: [
+        [Sequelize.fn("COUNT", Sequelize.col("id")), "paid_orders"],
+        [
+          Sequelize.fn(
+            "COALESCE",
+            Sequelize.fn("SUM", Sequelize.col("total_amount")),
+            0
+          ),
+          "revenue",
+        ],
+      ],
+      raw: true,
+    });
+    const kpi = totals?.[0] || { paid_orders: 0, revenue: 0 };
+
+    // Seats sold (đếm OrderItem của các order paid)
+    const seatsRow = await OrderItem.findAll({
+      include: [
+        { model: Order, as: "order", attributes: [], where: wherePaid },
+      ],
+      attributes: [
+        [Sequelize.fn("COUNT", Sequelize.col("OrderItem.id")), "seats"],
+      ],
+      raw: true,
+    });
+    const seats_sold = Number(seatsRow?.[0]?.seats || 0);
+
+    // Daily series
+    const daily = await Order.findAll({
+      where: wherePaid,
+      attributes: [
+        [Sequelize.fn("DATE", Sequelize.col("created_at")), "date"],
+        [
+          Sequelize.fn(
+            "COALESCE",
+            Sequelize.fn("SUM", Sequelize.col("total_amount")),
+            0
+          ),
+          "revenue",
+        ],
+        // đếm items trong ngày: sum of subquery counts
+        [
+          Sequelize.literal(`SUM((
+          SELECT COUNT(oi.id)
+          FROM OrderItems oi
+          WHERE oi.order_id = \`Order\`.id
+        ))`),
+          "seats_of_order",
+        ],
+      ],
+      group: [Sequelize.fn("DATE", Sequelize.col("created_at"))],
+      raw: true,
+    });
+
+    // daily is already grouped by date
+    const dailySeries = daily
+      .map((row) => ({
+        date: row.date,
+        revenue: Number(row.revenue || 0),
+        seats: Number(row.seats_of_order || 0),
+      }))
+      .sort((a, b) => a.date.localeCompare(b.date));
+
+    return res.json({
+      revenue: Number(kpi.revenue || 0),
+      paid_orders: Number(kpi.paid_orders || 0),
+      seats_sold,
+      daily: dailySeries,
+    });
+  } catch (e) {
+    return res
+      .status(500)
+      .json({ message: "metrics failed", detail: "ahsuib" + e.message });
+  }
+}
+export default {
+  previewOrder,
+  createOrder,
+  getAllOrders,
+  getOrderDetail,
+  getOrderMetrics,
+};

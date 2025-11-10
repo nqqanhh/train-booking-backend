@@ -10,5 +10,6 @@ const ordersRouter = Router();
 ordersRouter.get("/", orderController.getAllOrders);
 ordersRouter.post("/preview", orderController.previewOrder);
 ordersRouter.post("/", orderController.createOrder);
+ordersRouter.get("/metrics", orderController.getOrderMetrics);
 ordersRouter.get("/:id", orderController.getOrderDetail);
 export default ordersRouter;
