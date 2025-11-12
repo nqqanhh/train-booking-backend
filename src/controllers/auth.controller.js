@@ -72,12 +72,6 @@ export const signUp = async (req, res) => {
 const login = async (req, res) => {
   try {
     let { email, phone, password } = req.body || {};
-
-    if (!password || (!email && !phone)) {
-      return res.status(400).json({ message: "Thiếu password và email/phone" });
-    }
-
-    // Ưu tiên email nếu gửi cả hai
     let where;
     if (email) {
       email = String(email).trim().toLowerCase();
@@ -86,11 +80,22 @@ const login = async (req, res) => {
       phone = String(phone).trim();
       where = { phone };
     }
+    if (!where) {
+      return res
+        .status(400)
+        .json({ message: "Thiếu email hoặc số điện thoại" });
+    }
+    console.log("where:", where);
+    if (!password) {
+      return res.status(400).json({ message: "Thiếu password và email/phone" });
+    }
+
+    // Ưu tiên email nếu gửi cả hai
 
     const user = await User.findOne({ where });
     // Không tiết lộ "email có/không", trả lỗi chung
     if (!user)
-      return res.status(401).json({ message: "Sai thông tin đăng nhập" });
+      return res.status(401).json({ message: "Sai thông tin đăng nhập 1" });
 
     // So khớp mật khẩu
     const ok = await bcrypt.compare(password, user.password_hash);
