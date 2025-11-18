@@ -18,6 +18,7 @@ import myRouter from "./my.route.js";
 import carriageRouter from "./carriage.route.js";
 import TripScheduleRouter from "./tripschedule.route.js";
 import clientRouter from "./client.route.js";
+import aiRouter from "./ai.route.js";
 const router = Router();
 //
 router.get("/", (req, res) => {
@@ -47,4 +48,6 @@ router.use("/trip-schedules", TripScheduleRouter);
 //
 router.use("/client", clientRouter);
 //
+router.use("/ai", aiRouter);
+
 export default router;
