@@ -343,18 +343,39 @@ export const generateSeatsForTrip = async (req, res) => {
 
 export const getOneTrip = async (req, res) => {
   try {
-    const id = req.params;
-    const trip = await Trip.findOne(id);
-    console.log("trip", trip);
-    res.status(200).json({
-      message: "OK",
-      trip,
+    const { id } = req.params;
+
+    const trip = await Trip.findOne({
+      where: { id },
+      include: [
+        {
+          model: Route,
+          as: "route",
+          attributes: [
+            "id",
+            "origin",
+            "destination",
+            "distance_km",
+            "eta_minutes",
+          ],
+        },
+        {
+          model: Carriage,
+          as: "carriages",
+          attributes: ["id", "carriage_no"],
+          required: false,
+        },
+      ],
     });
+
+    if (!trip) return res.status(404).json({ message: "Trip not found" });
+
+    return res.status(200).json({ message: "OK", trip });
   } catch (error) {
     console.log(error.message);
-    return res.status(500).json({
-      message: "Get trip header failed" + error.message,
-    });
+    return res
+      .status(500)
+      .json({ message: "Get trip header failed: " + error.message });
   }
 };
 const tripController = {
