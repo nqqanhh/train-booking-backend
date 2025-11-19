@@ -378,6 +378,35 @@ export const getOneTrip = async (req, res) => {
       .json({ message: "Get trip header failed: " + error.message });
   }
 };
+
+const getAvailableSeats = async (req, res) => {
+  try {
+    const { id: tripId } = req.params;
+    const trip = await Trip.findByPk(tripId);
+    if (!trip) {
+      return res.status(404).json({
+        message: "Trip not found",
+      });
+    }
+    const availableSeats = await TripSeat.count({
+      include: [
+        {
+          model: Carriage,
+          as: "carriage",
+          attributes: [],
+          where: { trip_id: tripId },
+        },
+      ],
+      where: { status: "available" },
+    });
+    res.status(200).json({ trip_id: tripId, available_seats: availableSeats });
+  } catch (error) {
+    return res.status(500).json({
+      message: "Failed to get available seats count",
+      detail: error.message,
+    });
+  }
+};
 const tripController = {
   listTrips,
   getTrips,
@@ -387,5 +416,6 @@ const tripController = {
   getSeatMap,
   generateSeatsForTrip,
   getOneTrip,
+  getAvailableSeats,
 };
 export default tripController;
