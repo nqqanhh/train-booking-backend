@@ -1,33 +1,127 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
-import { getUpcomingTrips } from "../services/userService.js";
 import db from "../models/index.js";
+import { Op } from "sequelize";
+
 const genAI = new GoogleGenerativeAI(process.env.GOOGLE_AI_API_KEY);
 const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
-import { Op } from "sequelize";
-const { Route, Trip } = db;
+
+const { Route, Trip, Sequelize } = db;
+
+// helper: bỏ ```json ... ```
+function stripCodeFence(text = "") {
+  let t = text.trim();
+  if (t.startsWith("```")) {
+    t = t
+      .replace(/^```[a-zA-Z]*\n?/, "")
+      .replace(/```$/, "")
+      .trim();
+  }
+  return t;
+}
+
+// helper: AI bóc tách ga đi, ga đến, ngày đi từ message
+async function extractTravelInfo(message, stationNames = []) {
+  const extractPrompt = `
+Người dùng nhắn: "${message}"
+
+Hãy trích xuất thông tin chuyến đi (nếu có) thành JSON với cấu trúc:
+{
+  "origin": "tên ga đi hoặc null",
+  "destination": "tên ga đến hoặc null",
+  "date": "YYYY-MM-DD hoặc null",
+  "missing": ["origin", "destination", "date"]
+}
+
+- "missing" là mảng các field còn thiếu thông tin.
+- Nếu không chắc về ngày thì để "date": null.
+- Danh sách tên ga hợp lệ trong hệ thống: ${stationNames.join(", ")}.
+- Nếu người dùng dùng từ tương đương (ví dụ: "SG", "Sài Gòn", "tp.hcm") thì cố map về đúng 1 trong các tên ga trên.
+- Không được trả gì ngoài JSON hợp lệ.
+`.trim();
+
+  const result = await model.generateContent(extractPrompt);
+  let text = stripCodeFence(result.response.text() || "");
+  try {
+    return JSON.parse(text);
+  } catch (e) {
+    console.error("extractTravelInfo JSON parse failed:", text);
+    return { origin: null, destination: null, date: null, missing: [] };
+  }
+}
+
 export const chatWithAI = async (req, res) => {
   try {
-    const { message, origin, destination, date } = req.body;
+    let { message, origin, destination, date, route_id } = req.body || {};
 
-    // 1. Query route + trips từ DB nếu client truyền đầy đủ
-    let route = null;
-    let trips = [];
-
-    if (origin && destination) {
-      route = await Route.findOne({
-        where: { origin, destination },
-      });
+    if (!message || typeof message !== "string") {
+      return res.status(400).json({ message: "message is required" });
     }
 
-    if (route && date) {
-      const start = `${date} 00:00:00`;
-      const end = `${date} 23:59:59`;
+    // ================== 1. Nếu thiếu origin/destination/date thì nhờ AI bóc tách ==================
+    if (!origin || !destination || !date) {
+      const routesAll = await Route.findAll({
+        attributes: ["origin", "destination"],
+      });
 
+      const stationSet = new Set();
+      routesAll.forEach((r) => {
+        stationSet.add(r.origin);
+        stationSet.add(r.destination);
+      });
+      const stationNames = Array.from(stationSet);
+
+      const extracted = await extractTravelInfo(message, stationNames);
+
+      origin = origin || extracted.origin || null;
+      destination = destination || extracted.destination || null;
+      date = date || extracted.date || null;
+    }
+
+    // ================== 2. Lấy danh sách route phù hợp ==================
+    let routes = [];
+
+    if (route_id) {
+      const r = await Route.findByPk(route_id);
+      if (r) routes = [r];
+    } else if (origin && destination) {
+      const originTrim = String(origin).trim();
+      const destTrim = String(destination).trim();
+
+      routes = await Route.findAll({
+        where: {
+          origin: { [Op.like]: `%${originTrim}%` },
+          destination: { [Op.like]: `%${destTrim}%` },
+        },
+        order: [["id", "ASC"]],
+      });
+
+      if (routes.length === 0) {
+        routes = await Route.findAll({
+          where: {
+            origin: originTrim,
+            destination: destTrim,
+          },
+          order: [["id", "ASC"]],
+        });
+      }
+    }
+
+    const primaryRoute = routes[0] || null;
+    const routeIds = routes.map((r) => r.id);
+
+    // ================== 3. Tìm trips theo nhiều route + date ==================
+    let trips = [];
+    if (routeIds.length > 0 && date) {
       trips = await Trip.findAll({
         where: {
-          route_id: route.id,
-          departure_time: { [Op.between]: [start, end] },
-          status: "scheduled",
+          route_id: { [Op.in]: routeIds },
+          status: "scheduled", // chỉnh nếu ông dùng status khác
+          [Op.and]: [
+            Sequelize.where(
+              Sequelize.fn("DATE", Sequelize.col("departure_time")),
+              date
+            ),
+          ],
         },
         include: [
           {
@@ -46,10 +140,16 @@ export const chatWithAI = async (req, res) => {
       });
     }
 
-    // 2. Convert dữ liệu DB thành text context
-    const routeText = route
-      ? `Tuyến hiện tại: ${route.origin} → ${route.destination}, khoảng cách ${route.distance_km} km, thời gian dự kiến ${route.eta_minutes} phút.`
-      : "Chưa xác định được tuyến cụ thể (origin/destination chưa đủ hoặc không tồn tại trong hệ thống).";
+    console.log("AI DEBUG:", {
+      body: { message, origin, destination, date, route_id },
+      routeIds,
+      tripsCount: trips.length,
+    });
+
+    // ================== 4. Build context text ==================
+    const routeText = primaryRoute
+      ? `Một trong các tuyến phù hợp: ${primaryRoute.origin} → ${primaryRoute.destination}, khoảng cách ${primaryRoute.distance_km} km, thời gian dự kiến ${primaryRoute.eta_minutes} phút.`
+      : "Chưa xác định được tuyến cụ thể (origin/destination hoặc route_id chưa khớp với dữ liệu trong hệ thống).";
 
     let tripsText = "Hiện chưa có thông tin chuyến nào trong ngữ cảnh.\n";
     if (trips.length > 0) {
@@ -66,8 +166,8 @@ export const chatWithAI = async (req, res) => {
           .join("\n");
     }
 
-    // 3. Ghép toàn bộ prompt thành một string
-    const prompt = `
+    // ================== 5. Prompt tư vấn chính ==================
+    const mainPrompt = `
 Bạn là trợ lý AI của hệ thống đặt vé tàu E-Train.
 
 Nhiệm vụ:
@@ -82,26 +182,66 @@ ${routeText}
 [THÔNG TIN CÁC CHUYẾN]
 ${tripsText}
 
+[THÔNG TIN ĐÃ HIỂU TỪ TIN NHẮN]
+origin hiện tại: ${origin || "null"}
+destination hiện tại: ${destination || "null"}
+date hiện tại: ${date || "null"}
+
 [NGƯỜI DÙNG HỎI]
 ${message}
 
-[HƯỚNG DẪN TRẢ LỜI]
-- Nếu có chuyến phù hợp, hãy gợi ý 1–3 chuyến cụ thể (nêu giờ khởi hành, tuyến, gợi ý).
-- Nếu không có chuyến nào, hãy thông báo nhẹ nhàng và gợi ý đổi ngày/tuyến.
+Hãy trả lời DUY NHẤT dưới dạng JSON, KHÔNG dùng markdown, KHÔNG dùng \`\`\`, với cấu trúc:
+{
+  "reply": "câu trả lời tiếng Việt cho người dùng, dạng hội thoại",
+  "suggested_trips": [
+    {
+      "trip_id": 1,
+      "reason": "Vì sao gợi ý chuyến này (ví dụ: giờ phù hợp, ít trễ...)"
+    }
+  ],
+  "need_more_info": false,
+  "parsed": {
+    "origin": "ga đi (có thể giống hoặc khác origin hiện tại, nếu bạn hiểu rõ hơn)",
+    "destination": "ga đến",
+    "date": "YYYY-MM-DD hoặc null"
+  }
+}
+
+- "suggested_trips" có thể là mảng rỗng nếu không có gợi ý.
+- "parsed" giúp client hiểu lại bạn đang dùng origin/destination/date nào.
+- Không được thêm bất kỳ text nào ngoài JSON hợp lệ.
 `.trim();
 
-    // 4. Gọi Gemini đúng format (chỉ cần 1 string)
-    const result = await model.generateContent(prompt);
+    const mainResult = await model.generateContent(mainPrompt);
+    let mainText = stripCodeFence(mainResult.response.text() || "");
 
-    const reply =
-      result.response.text() || "Xin lỗi, hiện tại tôi không trả lời được.";
+    let data;
+    try {
+      data = JSON.parse(mainText);
+    } catch (e) {
+      console.error("AI main JSON parse failed, raw text:", mainText);
+      data = {
+        reply:
+          mainText ||
+          "Xin lỗi, hiện tại tôi chưa xử lý được yêu cầu này. Bạn thử hỏi lại giúp mình nhé.",
+        suggested_trips: [],
+        need_more_info: false,
+        parsed: { origin, destination, date },
+      };
+    }
 
-    return res.json({ reply });
-  } catch (error) {
-    console.error("tripAssistant error:", error);
+    if (!Array.isArray(data.suggested_trips)) data.suggested_trips = [];
+    if (typeof data.need_more_info !== "boolean") data.need_more_info = false;
+    if (typeof data.parsed !== "object" || data.parsed === null) {
+      data.parsed = { origin, destination, date };
+    }
+
+    return res.json(data);
+  } catch (err) {
+    console.error("chatWithAI error:", err);
     return res.status(500).json({
       message: "AI error",
-      detail: error.message,
+      detail: err.message,
     });
   }
 };
