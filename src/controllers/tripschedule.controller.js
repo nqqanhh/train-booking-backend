@@ -180,19 +180,21 @@ export const createSchedule = async (req, res) => {
 async function generateSeatsForCarriage(carriage_id, t) {
   const car = await Carriage.findByPk(carriage_id, { transaction: t });
   if (!car) return;
+
   const tplSeats = await SeatTemplateSeat.findAll({
     where: { template_id: car.seat_template_id },
+    attributes: ["seat_code", "base_price", "seat_class", "pos_row", "pos_col"],
     transaction: t,
+    raw: true,
   });
   if (!tplSeats.length) return;
 
   const payload = tplSeats.map((s) => ({
     carriage_id: car.id,
     seat_code: s.seat_code,
-    status: "available", // giả định ENUM đã có "available"
-    // nếu TripSeat có thêm các cột pos_row/pos_col/seat_class/base_price => có thể copy luôn:
-    // pos_row: s.pos_row, pos_col: s.pos_col,
-    // seat_class: s.seat_class, base_price: s.base_price,
+    price: s.base_price != null ? Number(s.base_price) : 0, // snapshot giá niêm yết
+    status: "available",
+    // created_at / updated_at dùng default CURRENT_TIMESTAMP của DB là đủ
   }));
 
   await TripSeat.bulkCreate(payload, {
@@ -200,6 +202,7 @@ async function generateSeatsForCarriage(carriage_id, t) {
     transaction: t,
   });
 }
+
 
 // export const createSchedule = async (req, res) => {
 //   try {

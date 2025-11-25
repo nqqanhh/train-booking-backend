@@ -19,6 +19,8 @@ export default (sequelize, DataTypes) => {
     {
       carriage_id: { type: DataTypes.BIGINT, allowNull: false }, // thay trip_id
       seat_code: { type: DataTypes.STRING(32), allowNull: false },
+      price: { type: DataTypes.DECIMAL(12, 2), allowNull: true },
+
       // nếu có sold_at / order_item_id thì giữ nguyên
       order_item_id: { type: DataTypes.BIGINT },
       sold_at: { type: DataTypes.DATE },

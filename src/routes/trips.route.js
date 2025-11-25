@@ -10,6 +10,10 @@ tripsRouter.get("/:id/seatmap", tripController.getSeatMap);
 tripsRouter.get("/:id", tripController.getOneTrip);
 tripsRouter.post("/:id/generate-seats", tripController.generateSeatsForTrip);
 tripsRouter.get("/:id/available-seats", tripController.getAvailableSeats);
+tripsRouter.get(
+  "/:id/carriage-groups",
+  tripController.getCarriageGroupsForTrip
+);
 // admin (REST chuẩn)
 tripsRouter.get("/", tripController.getTrips);
 tripsRouter.post("/", tripController.createTrip);

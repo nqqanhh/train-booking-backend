@@ -1,7 +1,14 @@
 // src/controllers/carriages.controller.js
 import { ensureTripSeatsForTrip } from "../services/tripseat.service.js";
 import db from "../models/index.js";
-const { Carriage, Trip, SeatTemplate, SeatTemplateSeat, TripSeat } = db;
+const {
+  Carriage,
+  Trip,
+  SeatTemplate,
+  SeatTemplateSeat,
+  TripSeat,
+  CarriageType,
+} = db;
 
 // async function ensureTripSeatsForTrip(trip_id, t) {
 //   const carriages = await Carriage.findAll({
@@ -141,40 +148,66 @@ export const deleteCarriage = async (req, res) => {
   }
 };
 
-export async function generateSeats(carriageId, transaction = null) {
-  // kiểm tra kỹ input
-  const id = Number(
-    typeof carriageId === "object"
-      ? carriageId.id ?? carriageId.carriage_id
-      : carriageId
-  );
-  if (!id || isNaN(id)) throw new Error("Invalid carriage_id");
+// POST /carriages/:id/generate-seats
+export const generateSeats = async (req, res) => {
+  const t = await db.sequelize.transaction();
+  try {
+    const id = Number(req.params.id);
+    if (!id) {
+      await t.rollback();
+      return res.status(400).json({ message: "Invalid carriage id" });
+    }
 
-  const carriage = await Carriage.findByPk(id, { transaction });
-  if (!carriage) throw new Error(`Carriage ${id} not found`);
+    const carriage = await Carriage.findByPk(id, { transaction: t });
+    if (!carriage) {
+      await t.rollback();
+      return res.status(404).json({ message: "Carriage not found" });
+    }
 
-  const tplSeats = await SeatTemplateSeat.findAll({
-    where: { template_id: carriage.seat_template_id },
-    attributes: ["seat_code"],
-    transaction,
-  });
-  if (!tplSeats.length)
-    throw new Error(`Template ${carriage.seat_template_id} has no seats`);
+    const tplSeats = await SeatTemplateSeat.findAll({
+      where: { template_id: carriage.seat_template_id },
+      attributes: ["seat_code", "base_price"],
+      transaction: t,
+      raw: true,
+    });
+    if (!tplSeats.length) {
+      await t.rollback();
+      return res
+        .status(400)
+        .json({ message: "SeatTemplate has no seats configured" });
+    }
 
-  const payload = tplSeats.map((s) => ({
-    carriage_id: carriage.id,
-    seat_code: s.seat_code,
-  }));
+    const payload = tplSeats.map((s) => ({
+      carriage_id: carriage.id,
+      seat_code: s.seat_code,
+      price: s.base_price != null ? Number(s.base_price) : 0,
+      status: "available",
+    }));
 
-  await TripSeat.bulkCreate(payload, { transaction, ignoreDuplicates: true });
+    await TripSeat.bulkCreate(payload, {
+      transaction: t,
+      ignoreDuplicates: true,
+    });
 
-  return TripSeat.findAll({
-    where: { carriage_id: id },
-    attributes: ["id", "carriage_id", "seat_code", "order_item_id", "status"],
-    order: [["seat_code", "ASC"]],
-    transaction,
-  });
-}
+    await t.commit();
+    const items = await TripSeat.findAll({
+      where: { carriage_id: id },
+      order: [["seat_code", "ASC"]],
+    });
+
+    return res.json({
+      message: "Seats generated for carriage",
+      carriage_id: id,
+      count: items.length,
+      items,
+    });
+  } catch (e) {
+    await t.rollback();
+    return res
+      .status(500)
+      .json({ message: "generate seats failed", detail: e.message });
+  }
+};
 
 export const listSeatsByCarriage = async (req, res) => {
   try {
@@ -220,98 +253,150 @@ export const listSeatsByTrip = async (req, res) => {
       .json({ message: "Internal error", detail: err.message });
   }
 };
-export const getCarriageSeatMap = async (req, res) => {
-  const { id } = req.params;
+// GET /carriages/:id/seatmap
+const getCarriageSeatMap = async (req, res) => {
   try {
-    const payload = await withTx(db.sequelize, async (t) => {
-      const carriage = await Carriage.findByPk(id, {
-        transaction: t,
-        raw: true,
-      });
-      if (!carriage) return { notFound: true };
+    const id = Number(req.params.id);
+    if (!id) {
+      return res.status(400).json({ message: "Invalid carriage id" });
+    }
 
-      // Seed nếu thiếu
-      await ensureTripSeatsForTrip(carriage.trip_id, t);
-
-      const [tplSeats, tripSeats] = await Promise.all([
-        SeatTemplateSeat.findAll({
-          where: { template_id: carriage.seat_template_id },
-          attributes: [
-            "seat_code",
-            "pos_row",
-            "pos_col",
-            "seat_class",
-            "base_price",
-          ],
-          order: [
-            ["pos_row", "ASC"],
-            ["pos_col", "ASC"],
-          ],
-          transaction: t,
-          raw: true,
-        }),
-        TripSeat.findAll({
-          where: { carriage_id: id },
-          attributes: ["seat_code", "order_item_id", "status"],
-          transaction: t,
-          raw: true,
-        }),
-      ]);
-
-      const map = new Map(tripSeats.map((s) => [s.seat_code, s]));
-      const seats = tplSeats.map((s) => {
-        const ts = map.get(s.seat_code);
-        const sold = ts?.status === "sold" || ts?.order_item_id != null;
-        return {
-          seat_code: s.seat_code,
-          class: s.seat_class || "std",
-          row: s.pos_row,
-          col: s.pos_col,
-          price: Number(s.base_price),
-          sold,
-          status: ts?.status ?? (sold ? "sold" : "available"),
-        };
-      });
-
-      return { carriage_id: Number(id), trip_id: carriage.trip_id, seats };
+    const carriage = await Carriage.findByPk(id, {
+      include: [
+        {
+          model: SeatTemplate,
+          as: "seat_template",
+        },
+      ],
     });
 
-    if (payload?.notFound)
+    if (!carriage) {
       return res.status(404).json({ message: "Carriage not found" });
-    return res.json(payload);
-  } catch (e) {
+    }
+
+    const tpl = carriage.seat_template;
+    if (!tpl) {
+      return res
+        .status(400)
+        .json({ message: "Carriage has no seat template assigned" });
+    }
+
+    const [tplSeats, tripSeats] = await Promise.all([
+      SeatTemplateSeat.findAll({
+        where: { template_id: tpl.id },
+        attributes: [
+          "seat_code",
+          "pos_row",
+          "pos_col",
+          "seat_class",
+          "base_price",
+        ],
+        order: [
+          ["pos_row", "ASC"],
+          ["pos_col", "ASC"],
+        ],
+        raw: true,
+      }),
+      TripSeat.findAll({
+        where: { carriage_id: id },
+        attributes: ["seat_code", "price", "status", "order_item_id"],
+        raw: true,
+      }),
+    ]);
+
+    const tsMap = new Map(tripSeats.map((ts) => [ts.seat_code, ts]));
+
+    const seats = tplSeats.map((s) => {
+      const ts = tsMap.get(s.seat_code);
+      const sold =
+        ts?.status === "sold" ||
+        (ts?.order_item_id != null && ts?.status !== "refunded");
+
+      return {
+        seat_code: s.seat_code,
+        class: s.seat_class || "standard",
+        row: s.pos_row,
+        col: s.pos_col,
+        price:
+          ts?.price != null
+            ? Number(ts.price)
+            : s.base_price != null
+            ? Number(s.base_price)
+            : 0,
+        status: ts?.status || (sold ? "sold" : "available"),
+        order_item_id: ts?.order_item_id ?? null,
+      };
+    });
+
+    return res.json({
+      carriage_id: carriage.id,
+      carriage_no: carriage.carriage_no,
+      name: carriage.name,
+      seats,
+    });
+  } catch (error) {
+    console.error("getCarriageSeatMap error:", error);
     return res
       .status(500)
-      .json({ message: "Internal error", detail: e.message });
+      .json({ message: "Internal error: " + error.message });
   }
 };
 
 export const generateSeatsEndpoint = async (req, res) => {
   const t = await db.sequelize.transaction();
   try {
-    console.log("[generateSeatsEndpoint] req.params =", req.params);
+    const id = Number(req.params.id);
+    if (!id) {
+      await t.rollback();
+      return res.status(400).json({ message: "Invalid carriage id" });
+    }
 
-    // bóc id ra an toàn nhất
-    const id = Number(
-      req.params.id?.id || req.params.id?.carriage_id || req.params.id
-    );
-    if (!id || isNaN(id)) {
+    const carriage = await Carriage.findByPk(id, { transaction: t });
+    if (!carriage) {
+      await t.rollback();
+      return res.status(404).json({ message: "Carriage not found" });
+    }
+
+    const tplSeats = await SeatTemplateSeat.findAll({
+      where: { template_id: carriage.seat_template_id },
+      attributes: ["seat_code", "base_price"],
+      transaction: t,
+      raw: true,
+    });
+    if (!tplSeats.length) {
       await t.rollback();
       return res
         .status(400)
-        .json({ message: "Invalid carriage_id", raw: req.params });
+        .json({ message: "SeatTemplate has no seats configured" });
     }
 
-    const seats = await generateSeats(id, t);
+    const payload = tplSeats.map((s) => ({
+      carriage_id: carriage.id,
+      seat_code: s.seat_code,
+      price: s.base_price != null ? Number(s.base_price) : 0,
+      status: "available",
+    }));
+
+    await TripSeat.bulkCreate(payload, {
+      transaction: t,
+      ignoreDuplicates: true,
+    });
+
     await t.commit();
-    return res.status(201).json({
-      message: "Seats generated successfully",
-      count: seats.length,
-      seats,
+    const items = await TripSeat.findAll({
+      where: { carriage_id: id },
+      order: [["seat_code", "ASC"]],
+    });
+
+    return res.json({
+      message: "Seats generated for carriage",
+      carriage_id: id,
+      count: items.length,
+      items,
     });
   } catch (err) {
     await t.rollback();
-    console.error("generateSeats error:", err);
+    console.error("generateSeatsEndpoint error:", err);
     return res
       .status(500)
       .json({ message: "generate-seats failed", detail: err.message });

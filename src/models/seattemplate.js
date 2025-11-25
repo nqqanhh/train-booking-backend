@@ -4,6 +4,10 @@ import Sequelize from "sequelize";
 export default (sequelize, DataTypes) => {
   class SeatTemplate extends Model {
     static associate(m) {
+      SeatTemplate.belongsTo(m.CarriageType, {
+        foreignKey: "carriage_type_id",
+        as: "carriage_type",
+      });
       SeatTemplate.hasMany(m.SeatTemplateSeat, {
         foreignKey: "template_id",
         as: "seats",
@@ -19,6 +23,7 @@ export default (sequelize, DataTypes) => {
   SeatTemplate.init(
     {
       name: { type: DataTypes.STRING(255), allowNull: false },
+      carriage_type_id: { type: DataTypes.INTEGER, allowNull: true },
       meta_json: { type: DataTypes.JSON },
       created_at: {
         type: DataTypes.DATE,
